@@ -13,7 +13,7 @@ async function read(name: string) {
     const page = await pdf.getPage(n);
     geometries.push({ view: page.view as PdfRect, rotation: page.rotate });
   }
-  return readForm(pdf, geometries);
+  return { ...(await readForm(pdf, geometries)), geometries };
 }
 
 describe('readForm (AcroForm)', () => {
@@ -80,7 +80,7 @@ describe('savePdf with form values', () => {
     const original = fixture(file);
     const form = await read(file);
     const bytes = await savePdf(original, {
-      form: { fields: form.fields, values, initialValues: form.initialValues, flatten },
+      form: { fields: form.fields, values, initialValues: form.initialValues, flatten, geometries: form.geometries },
       fontBytes: fieldFont(),
     });
     return { bytes, original };
@@ -125,7 +125,7 @@ describe('savePdf with form values', () => {
   it('refuses characters the font cannot draw instead of dropping them', async () => {
     const form = await read('acroform.pdf');
     const error = await savePdf(fixture('acroform.pdf'), {
-      form: { fields: form.fields, values: { ...values, cognome: 'Nguyễn Văn Ơn' }, initialValues: form.initialValues, flatten: true },
+      form: { fields: form.fields, values: { ...values, cognome: 'Nguyễn Văn Ơn' }, initialValues: form.initialValues, flatten: true, geometries: form.geometries },
       fontBytes: fieldFont(),
     }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(PdfSaveError);
@@ -137,7 +137,7 @@ describe('savePdf with form values', () => {
     const original = fixture('xfa-hybrid.pdf');
     const form = await read('xfa-hybrid.pdf');
     const bytes = await savePdf(original, {
-      form: { fields: form.fields, values: { nome: 'Mario' }, initialValues: form.initialValues, flatten: false },
+      form: { fields: form.fields, values: { nome: 'Mario' }, initialValues: form.initialValues, flatten: false, geometries: form.geometries },
       fontBytes: fieldFont(),
     });
     const { info } = (await (await openWithPdfjs(bytes)).getMetadata()) as { info: { IsXFAPresent?: boolean } };

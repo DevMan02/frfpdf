@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Notice } from '../components/Notice';
 import { Toolbar } from '../components/Toolbar';
-import { ToolPanel } from '../components/ToolPanel';
+import { ToolPanel, type AddKind } from '../components/ToolPanel';
 import { useFileDrop } from '../components/useFileDrop';
 import { Welcome } from '../components/Welcome';
+import { detectPage } from '../features/forms/detectForm';
 import { EmptyFieldsDialog } from '../features/forms/EmptyFieldsDialog';
 import { fetchFieldFontBytes, useFieldFont } from '../features/forms/fieldFont';
-import { fieldElementId, FieldLayer } from '../features/forms/FieldLayer';
+import { fieldDomId, fieldElementId, FieldLayer } from '../features/forms/FieldLayer';
 import { readForm, type FormInfo } from '../features/forms/readForm';
 import { openPdf, type LoadedPdf } from '../features/viewer/pdfjs';
 import { Thumbnails } from '../features/viewer/Thumbnails';
 import { pageElementId, Viewer } from '../features/viewer/Viewer';
 import { fitWidthZoom, zoomIn, zoomOut } from '../features/viewer/zoom';
 import { t } from '../i18n';
+import { detectedToFields } from '../lib/detection/toFields';
+import { sortReadingOrder } from '../lib/forms/readingOrder';
 import {
   countAnswerable,
   countEmpty,
@@ -22,6 +25,7 @@ import {
   type FormField,
   type FormValues,
 } from '../lib/forms/types';
+import { displaySize, screenToPdfRect, type PdfRect } from '../lib/pdf/coords';
 import { buildOutputFileName } from '../lib/pdf/fileName';
 import { classifyLoadError } from '../lib/pdf/loadErrors';
 import { PdfSaveError } from '../lib/pdf/saveErrors';
@@ -51,7 +55,16 @@ export function App() {
   const [values, setValues] = useState<FormValues>({});
   const [flatten, setFlatten] = useState(true);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
+  const [fields, setFields] = useState<FormField[]>([]);
+  const [detecting, setDetecting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [addKind, setAddKind] = useState<AddKind>('text');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const fontReady = useFieldFont();
+  // Running numbers for "Campo N" labels and ids of fields added by hand.
+  const labelCounter = useRef(0);
+  const manualCounter = useRef(0);
+  const pendingFocus = useRef<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -62,13 +75,48 @@ export function App() {
   const widestPage = doc ? Math.max(...doc.pdf.pages.map((p) => p.width)) : 0;
   const zoom = zoomState.mode === 'fit' ? fitWidthZoom(viewerWidth, widestPage) : zoomState.value;
 
-  const fields = useMemo(() => doc?.form.fields ?? [], [doc]);
+  const geometryOf = useCallback((index: number) => docRef.current!.pdf.pages[index]!.geometry, []);
+  /** Flat documents (no AcroForm): fields are detected and can be added by clicking. */
+  const flatDocument = !!doc && doc.form.fields.length === 0 && doc.form.xfa !== 'pure';
   const fieldsByPage = useMemo(() => {
     const map = new Map<number, FormField[]>();
     for (const f of fields) map.set(f.pageIndex, [...(map.get(f.pageIndex) ?? []), f]);
     return map;
   }, [fields]);
   const emptyCount = countEmpty(fields, values);
+  /**
+   * On flat documents the fields are only guesses: they matter once the user
+   * starts filling them in. A plain PDF with a decorative box is just downloaded.
+   */
+  const startedFilling = fields.some((f) => !isEmptyValue(values[f.valueKey]));
+  const formInUse = fields.length > 0 && (!flatDocument || startedFilling || !flatten);
+
+  /** Looks for places to fill, page by page, while the document is already usable. */
+  const detectFields = useCallback(
+    async (target: OpenDocument) => {
+    setDetecting(true);
+    let scannedNoticeShown = false;
+    for (let index = 0; index < target.pdf.pages.length; index++) {
+      if (docRef.current !== target) return;
+      try {
+        const geometry = target.pdf.pages[index]!.geometry;
+        const result = await detectPage(target.pdf.proxy, index, geometry);
+        if (docRef.current !== target) return;
+        const found = detectedToFields(index, result.detected, geometry, () => t.forms.genericLabel(++labelCounter.current));
+        if (found.length) setFields((previous) => sortReadingOrder([...previous, ...found], geometryOf));
+        if (result.scanned && !scannedNoticeShown) {
+          scannedNoticeShown = true;
+          setMessage({ text: t.forms.scanned, tone: 'info' });
+        }
+      } catch (error) {
+        console.error(`Field detection failed on page ${index + 1}`, error);
+      }
+    }
+    if (docRef.current === target) setDetecting(false);
+    },
+    [geometryOf],
+  );
+
 
   const openFile = useCallback(async (file: File) => {
     const request = ++openRequest.current;
@@ -96,12 +144,18 @@ export function App() {
       const next = { id: request, name: file.name, bytes, pdf, form };
       docRef.current = next;
       setDoc(next);
+      setFields(form.fields);
       setValues(form.initialValues);
       setFlatten(true);
+      setEditing(false);
+      setSelectedId(null);
+      labelCounter.current = 0;
+      manualCounter.current = 0;
       setCurrentPage(1);
       setZoomState({ mode: 'fit' });
       viewerRef.current?.scrollTo({ top: 0 });
       if (form.xfa === 'pure') setMessage({ text: t.forms.xfaPure, tone: 'info' });
+      else if (!form.fields.length) void detectFields(next);
     } catch (err) {
       if (request !== openRequest.current) return;
       const code = classifyLoadError(err);
@@ -110,7 +164,58 @@ export function App() {
     } finally {
       if (request === openRequest.current) setOpening(false);
     }
+  }, [detectFields]);
+
+  const addFieldAt = useCallback(
+    (pageIndex: number, x: number, y: number) => {
+      const geometry = geometryOf(pageIndex);
+      const page = displaySize(geometry, 1);
+      const kind: AddKind = editing ? addKind : 'text';
+      const width = kind === 'checkbox' ? 12 : Math.min(200, page.width - 8);
+      const height = kind === 'checkbox' ? 12 : 18;
+      const left = Math.max(4, Math.min(kind === 'checkbox' ? x - width / 2 : x, page.width - width - 4));
+      const top = Math.max(4, Math.min(y - height / 2, page.height - height - 4));
+      const id = `man-${++manualCounter.current}`;
+      const field: FormField = {
+        id,
+        valueKey: id,
+        pageIndex,
+        rect: screenToPdfRect({ left, top, width, height }, geometry, 1),
+        kind,
+        label: t.forms.genericLabel(++labelCounter.current),
+        source: 'manual',
+        orientation: 'display',
+      };
+      setFields((previous) => sortReadingOrder([...previous, field], geometryOf));
+      if (editing) setSelectedId(id);
+      else pendingFocus.current = id;
+    },
+    [editing, addKind, geometryOf],
+  );
+
+  const moveField = useCallback((id: string, rect: PdfRect) => {
+    setFields((previous) => previous.map((f) => (f.id === id ? { ...f, rect } : f)));
   }, []);
+
+  const removeField = useCallback((id: string) => {
+    setFields((previous) => previous.filter((f) => f.id !== id));
+    setSelectedId((current) => (current === id ? null : current));
+  }, []);
+
+  const toggleEditing = useCallback(() => {
+    // Fields may have moved: restore the reading (Tab) order when done.
+    if (editing) setFields((previous) => sortReadingOrder(previous, geometryOf));
+    setEditing(!editing);
+    setSelectedId(null);
+  }, [editing, geometryOf]);
+
+  // Focus a field just added by clicking on the page.
+  useEffect(() => {
+    if (!pendingFocus.current) return;
+    const element = document.getElementById(fieldDomId(pendingFocus.current));
+    pendingFocus.current = null;
+    element?.focus();
+  }, [fields]);
 
   const handleFiles = useCallback(
     (files: File[]) => {
@@ -134,12 +239,17 @@ export function App() {
     try {
       // pdf-lib is loaded only when needed, from the app's own origin.
       const { savePdf } = await import('../lib/pdf/save');
-      const hasForm = doc.form.fields.length > 0;
       const output = await savePdf(
         doc.bytes,
-        hasForm
+        formInUse
           ? {
-              form: { fields: doc.form.fields, values, initialValues: doc.form.initialValues, flatten },
+              form: {
+                fields,
+                values,
+                initialValues: doc.form.initialValues,
+                flatten,
+                geometries: doc.pdf.pages.map((p) => p.geometry),
+              },
               fontBytes: await fetchFieldFontBytes(),
             }
           : {},
@@ -158,12 +268,12 @@ export function App() {
     } finally {
       setSaving(false);
     }
-  }, [doc, values, flatten]);
+  }, [doc, fields, values, flatten, formInUse]);
 
   const requestDownload = useCallback(() => {
-    if (emptyCount > 0) setConfirmEmpty(true);
+    if (formInUse && emptyCount > 0) setConfirmEmpty(true);
     else void download();
-  }, [emptyCount, download]);
+  }, [formInUse, emptyCount, download]);
 
   const backToForm = useCallback(() => {
     setConfirmEmpty(false);
@@ -182,8 +292,8 @@ export function App() {
 
   const renderOverlay = useCallback(
     (pageIndex: number, scale: number) => {
-      const pageFields = fieldsByPage.get(pageIndex);
-      if (!doc || !pageFields) return null;
+      const pageFields = fieldsByPage.get(pageIndex) ?? [];
+      if (!doc || (!pageFields.length && !flatDocument)) return null;
       return (
         <FieldLayer
           fields={pageFields}
@@ -192,10 +302,17 @@ export function App() {
           values={values}
           onChange={setFieldValue}
           fontReady={fontReady}
+          editing={editing}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onRectChange={moveField}
+          onRemove={removeField}
+          onAddAt={flatDocument ? (x, y) => addFieldAt(pageIndex, x, y) : undefined}
+          onLeaveEmpty={(field) => removeField(field.id)}
         />
       );
     },
-    [doc, fieldsByPage, values, setFieldValue, fontReady],
+    [doc, fieldsByPage, flatDocument, values, setFieldValue, fontReady, editing, selectedId, moveField, removeField, addFieldAt],
   );
 
   const fileInput = (
@@ -242,7 +359,7 @@ export function App() {
                 scrollRef={viewerRef}
                 onCurrentPageChange={setCurrentPage}
                 onWidthChange={setViewerWidth}
-                renderOverlay={fields.length ? renderOverlay : undefined}
+                renderOverlay={fields.length || flatDocument ? renderOverlay : undefined}
               />
             </main>
             <ToolPanel
@@ -253,6 +370,16 @@ export function App() {
                 flatten,
                 xfa: doc.form.xfa,
                 onFlattenChange: setFlatten,
+                detection: flatDocument
+                  ? {
+                      running: detecting,
+                      found: fields.filter((f) => f.source === 'detected').length,
+                      editing,
+                      addKind,
+                      onToggleEditing: toggleEditing,
+                      onAddKindChange: setAddKind,
+                    }
+                  : null,
               }}
               saving={saving}
               status={status}

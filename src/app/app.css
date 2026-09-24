@@ -575,6 +575,111 @@ button {
   opacity: 0.6;
 }
 
+/* Flat documents: clicking an empty spot adds a field there. */
+.field-layer--add {
+  pointer-events: auto;
+  cursor: text;
+}
+
+.field-layer--editing {
+  cursor: crosshair;
+}
+
+/* "Modifica campi": fields become movable boxes. */
+.field--edit {
+  border: 1px dashed rgb(47 79 158 / 0.8);
+  background: rgb(47 79 158 / 0.1);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.field--edit:hover,
+.field--edit.is-selected {
+  border-style: solid;
+  background: rgb(47 79 158 / 0.18);
+}
+
+.field--edit:focus-visible,
+.field--edit.is-selected {
+  outline: 2px solid #2f4f9e;
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+.field__edit-name {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  max-width: 220px;
+  padding: 1px 5px;
+  border-radius: 3px 3px 0 0;
+  background: #2f4f9e;
+  color: #ffffff;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.field--edit:hover .field__edit-name,
+.field--edit.is-selected .field__edit-name {
+  opacity: 1;
+}
+
+.field__remove {
+  position: absolute;
+  top: -11px;
+  right: -11px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #ffffff;
+  border-radius: 50%;
+  background: #9e3b2c;
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.field--edit:hover .field__remove,
+.field--edit.is-selected .field__remove {
+  opacity: 1;
+}
+
+.field__resize {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #ffffff;
+  background: #2f4f9e;
+  cursor: nwse-resize;
+}
+
+@media (pointer: coarse) {
+  /* Bigger handles for fingers. */
+  .field__resize {
+    right: -10px;
+    bottom: -10px;
+    width: 20px;
+    height: 20px;
+  }
+
+  .field__remove {
+    opacity: 1;
+  }
+}
+
 .field--signature {
   display: grid;
   place-items: center;
@@ -626,6 +731,66 @@ button {
 
 .tools__progress {
   font-variant-numeric: tabular-nums;
+}
+
+.tools__edit {
+  align-self: flex-start;
+}
+
+.tools__edit[aria-pressed='true'] {
+  border-color: var(--pen);
+  color: var(--pen);
+}
+
+/* Two-choice switch ("Testo" / "Casella"). */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.segmented legend {
+  width: 100%;
+  margin-bottom: 0.35rem;
+  padding: 0;
+  font-size: 0.8125rem;
+  color: var(--graphite);
+}
+
+.segmented label {
+  position: relative;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.segmented span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--thread);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.segmented input:checked + span {
+  border-color: var(--pen);
+  background: var(--pen);
+  color: var(--on-pen);
+}
+
+.segmented input:focus-visible + span {
+  box-shadow: var(--focus-ring);
 }
 
 /* Checkbox with its label, sized for touch. */

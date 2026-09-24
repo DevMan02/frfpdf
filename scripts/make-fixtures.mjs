@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { degrees, PDFDict, PDFDocument, PDFName, PDFString, rgb, StandardFonts } from 'pdf-lib';
 
@@ -152,9 +153,189 @@ await writePdf('xfa-pure.pdf', async (doc) => {
   page.drawText('Please wait... this document requires an XFA-capable viewer.', { x: 72, y: 760, size: 12, font });
 }, addXfaPacket);
 
+// 10. Flat form: blanks made of underscores and dots in the text.
+await writePdf('flat-underscores.pdf', async (doc) => {
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage(A4);
+  const line = (text, y, x = 72) => page.drawText(text, { x, y, size: 11, font });
+  page.drawText('Dichiarazione', { x: 72, y: 790, size: 18, font });
+  line('Il/La sottoscritto/a ________________________________________', 750);
+  line('nato/a a ____________________________ il ___/___/______', 725);
+  line('Codice fiscale: __________________________', 700);
+  line('Email ........................................................', 675);
+  line('Luogo e data ____________________', 600);
+  line('Firma ________________________', 600, 330);
+});
+
+// 11. Flat form: drawn lines, a caption under a line, drawn checkboxes, a big box.
+await writePdf('flat-lines.pdf', async (doc) => {
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage(A4);
+  const black = rgb(0, 0, 0);
+  const text = (t, x, y, size = 11) => page.drawText(t, { x, y, size, font });
+  const hline = (x1, x2, y) => page.drawLine({ start: { x: x1, y }, end: { x: x2, y }, thickness: 0.75, color: black });
+
+  text('Nome', 72, 760);
+  hline(110, 300, 757);
+  text('Cognome', 320, 760);
+  hline(372, 523, 757);
+
+  // Underlined heading: must not become a field.
+  const heading = 'Informativa sulla privacy';
+  text(heading, 72, 720);
+  hline(72, 72 + font.widthOfTextAtSize(heading, 11), 718);
+
+  // Signature line with the caption below it.
+  hline(72, 250, 640);
+  text('Firma', 140, 628, 9);
+
+  // Drawn checkboxes.
+  page.drawRectangle({ x: 72, y: 590, width: 10, height: 10, borderColor: black, borderWidth: 0.75 });
+  text('Sì', 86, 591);
+  page.drawRectangle({ x: 130, y: 590, width: 10, height: 10, borderColor: black, borderWidth: 0.75 });
+  text('No', 144, 591);
+
+  // Big empty box with its label above.
+  text('Note', 72, 526);
+  page.drawRectangle({ x: 72, y: 400, width: 451, height: 120, borderColor: black, borderWidth: 0.75 });
+});
+
+// 12. Flat form with tables, drawn like Word does (thin filled bars).
+await writePdf('flat-table.pdf', async (doc) => {
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage(A4);
+  const black = rgb(0, 0, 0);
+  const text = (t, x, y, size = 10) => page.drawText(t, { x, y, size, font });
+  const bar = (x1, y1, x2, y2) =>
+    page.drawRectangle({ x: x1, y: y1, width: Math.max(x2 - x1, 0.75), height: Math.max(y2 - y1, 0.75), color: black });
+  const grid = (xs, ys) => {
+    for (const y of ys) bar(xs[0], y, xs[xs.length - 1] + 0.75, y);
+    for (const x of xs) bar(x, ys[ys.length - 1], x, ys[0] + 0.75);
+  };
+
+  page.drawText('Lingue', { x: 72, y: 780, size: 14, font });
+  const cols = [72, 222, 302, 382, 452, 523];
+  grid(cols, [760, 740, 720, 700, 680]);
+  ['Lingua', 'Anni di studio', 'Parlato', 'Letto', 'Scritto'].forEach((h, i) => text(h, cols[i] + 4, 746));
+  ['Inglese', '13', 'Buono', 'Buono', 'Buono'].forEach((v, i) => text(v, cols[i] + 4, 726));
+
+  // A cell with a small label on top and room below; a cell already filled in.
+  grid([72, 222, 523], [640, 600]);
+  text('Religione', 76, 630, 8);
+  text('Restrizioni alimentari', 226, 630, 8);
+  text('Nessuna', 226, 608, 12);
+
+  // A question with Yes/No boxes in the next cell.
+  grid([72, 400, 523], [580, 556]);
+  text('Fumi?', 76, 564);
+  page.drawRectangle({ x: 410, y: 563, width: 10, height: 10, borderColor: black, borderWidth: 0.75 });
+  text('Sì', 424, 564);
+  page.drawRectangle({ x: 460, y: 563, width: 10, height: 10, borderColor: black, borderWidth: 0.75 });
+  text('No', 474, 564);
+});
+
+// 13. Scanned form: the whole page is one grey image (no text, no vector lines).
+await writePdf('scanned.pdf', async (doc) => {
+  const { width, height, pixels } = drawScannedForm();
+  const image = await doc.embedPng(encodeGrayPng(width, height, pixels));
+  const page = doc.addPage(A4);
+  page.drawImage(image, { x: 0, y: 0, width: A4[0], height: A4[1] });
+});
+
 console.log(`Fixtures written to ${OUT}`);
 
 // ---------------------------------------------------------------------------
+
+/**
+ * A 150 dpi A4 "scan": label-like blobs (as if text), a line to write on,
+ * a table, two checkboxes, a big box, and a line that is already written on.
+ */
+function drawScannedForm() {
+  const width = 1240;
+  const height = 1754;
+  const pixels = new Uint8Array(width * height).fill(250);
+  // Light noise, like paper grain.
+  let seed = 7;
+  const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < pixels.length; i += 7) pixels[i] = 235 + Math.floor(random() * 20);
+  const fill = (x1, y1, x2, y2, v = 30) => {
+    for (let y = y1; y < y2; y++) for (let x = x1; x < x2; x++) pixels[y * width + x] = v;
+  };
+  const hline = (x1, x2, y, t = 3) => fill(x1, y, x2, y + t);
+  const vline = (y1, y2, x, t = 3) => fill(x, y1, x + t, y2);
+  const rect = (x1, y1, x2, y2, t = 3) => {
+    hline(x1, x2, y1, t);
+    hline(x1, x2 + t, y2, t);
+    vline(y1, y2, x1, t);
+    vline(y1, y2, x2, t);
+  };
+  // "Text": a row of small letter-like blocks.
+  const words = (x, y, w, h = 18) => {
+    for (let cx = x; cx < x + w; cx += 14) fill(cx, y, cx + 9, y + h);
+  };
+
+  words(150, 296, 180); // label
+  hline(360, 900, 318); // line to write on
+
+  const xs = [150, 500, 800, 1090];
+  const ys = [500, 560, 620, 680];
+  for (const y of ys) hline(xs[0], xs[3] + 3, y);
+  for (const x of xs) vline(ys[0], ys[3] + 3, x);
+  words(170, 520, 150);
+  words(520, 520, 120);
+  words(820, 520, 110);
+
+  rect(150, 800, 176, 826); // checkbox
+  words(190, 804, 60);
+  rect(300, 800, 326, 826);
+  words(340, 804, 60);
+
+  words(150, 866, 100);
+  rect(150, 900, 1090, 1200); // big box
+
+  words(170, 1270, 400, 22); // handwriting on the line below
+  hline(150, 700, 1300);
+
+  return { width, height, pixels };
+}
+
+/** Minimal 8-bit greyscale PNG encoder (pdf-lib only embeds PNG/JPEG). */
+function encodeGrayPng(width, height, pixels) {
+  const raw = Buffer.alloc((width + 1) * height);
+  for (let y = 0; y < height; y++) {
+    raw[y * (width + 1)] = 0; // filter: none
+    Buffer.from(pixels.buffer, y * width, width).copy(raw, y * (width + 1) + 1);
+  }
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc32 = (buf) => {
+    let c = 0xffffffff;
+    for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 0; // greyscale
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
 
 /** pdf-lib cannot create signature fields: build the widget dictionary by hand. */
 function addSignatureField(doc, page, name, rect) {

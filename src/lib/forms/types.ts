@@ -38,6 +38,11 @@ export interface FormField {
   readOnly?: boolean;
   /** Font size requested by the form (0 or undefined = automatic). */
   fontSize?: number;
+  /**
+   * 'page' (AcroForm): the content turns with the page, like in every PDF reader.
+   * 'display' (detected or added by hand): text stays upright as the page is shown.
+   */
+  orientation?: 'page' | 'display';
 }
 
 /** Checkbox: boolean. Radio group: selected onValue ('' = none). Others: text. */

@@ -1,7 +1,9 @@
 import fontkit from '@pdf-lib/fontkit';
 import { PDFDocument } from 'pdf-lib';
 import type { FormField, FormValues } from '../forms/types';
+import type { PageGeometry } from './coords';
 import { fillAcroForm } from './fillForm';
+import { writeFlatFields } from './flatFields';
 import { PdfSaveError } from './saveErrors';
 
 export { PdfSaveError, type SaveErrorCode } from './saveErrors';
@@ -12,6 +14,8 @@ export interface SaveOptions {
     values: FormValues;
     initialValues: FormValues;
     flatten: boolean;
+    /** Page box and rotation of every page, as shown on screen. */
+    geometries: PageGeometry[];
   };
   /** TrueType font used for field values (full Unicode coverage). Required with `form`. */
   fontBytes?: Uint8Array;
@@ -32,13 +36,19 @@ export async function savePdf(original: Uint8Array, options: SaveOptions = {}): 
   if (doc.isEncrypted) throw new PdfSaveError('encrypted');
 
   const { form, fontBytes } = options;
-  if (form && form.fields.some((f) => f.source === 'acroform')) {
+  if (form && form.fields.length) {
     if (!fontBytes) throw new PdfSaveError('unknown', { cause: new Error('Missing field font') });
     const missing = unsupportedCharacters(form.values, fontBytes);
     if (missing.length) throw new PdfSaveError('unsupported-characters', { characters: missing });
     doc.registerFontkit(fontkit);
     const font = await doc.embedFont(fontBytes, { subset: true });
-    fillAcroForm(doc, font, form);
+
+    const acroFields = form.fields.filter((f) => f.source === 'acroform');
+    const flatFields = form.fields.filter((f) => f.source !== 'acroform');
+    if (acroFields.length) fillAcroForm(doc, font, { ...form, fields: acroFields });
+    if (flatFields.length) {
+      writeFlatFields(doc, font, { fields: flatFields, values: form.values, geometries: form.geometries, flatten: form.flatten });
+    }
   }
 
   // Appearances are generated above with our font; pdf-lib's own pass would use Helvetica.

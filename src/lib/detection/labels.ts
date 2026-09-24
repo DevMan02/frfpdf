@@ -6,7 +6,8 @@ export type LabelHint = 'date' | 'signature' | 'email' | 'tax-code' | 'name';
 
 const RULES: [LabelHint, RegExp][] = [
   ['signature', /\b(firma|firmato|signature|sign here)\b/],
-  ['date', /\b(data|date|nato il|nata il|il giorno)\b/],
+  // "il" alone (or at the end: "nato a Roma il") introduces a date in Italian forms.
+  ['date', /\b(data|date|nato il|nata il|il giorno)\b|(^|\s)il$/],
   ['email', /\b(e ?mail|pec|posta elettronica)\b/],
   ['tax-code', /\b(codice fiscale|c ?f|tax code)\b/],
   ['name', /\b(nome|cognome|nominativo|name|surname)\b/],

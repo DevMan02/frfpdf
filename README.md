@@ -8,7 +8,7 @@
 
 Strumento gratuito e open source per compilare moduli PDF, firmarli e gestirne le pagine.
 
-> Progetto in sviluppo. Stato attuale (fase 2a): apertura e visualizzazione dei PDF, compilazione dei moduli con campi veri (AcroForm), download di una copia con i campi bloccati o ancora compilabili.
+> Progetto in sviluppo. Stato attuale (fase 2): apertura e visualizzazione dei PDF; compilazione dei moduli con campi veri (AcroForm), dei PDF "piatti" e delle scansioni, con riconoscimento automatico degli spazi da compilare; download di una copia con i campi bloccati o compilabili.
 > Il README completo arriverà con la fase 6.
 
 ## Avvio in locale
