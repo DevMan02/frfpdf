@@ -8,7 +8,7 @@
 
 Strumento gratuito e open source per compilare moduli PDF, firmarli e gestirne le pagine.
 
-> Progetto in sviluppo. Stato attuale (fase 1): apertura e visualizzazione dei PDF, download di una copia.
+> Progetto in sviluppo. Stato attuale (fase 2a): apertura e visualizzazione dei PDF, compilazione dei moduli con campi veri (AcroForm), download di una copia con i campi bloccati o ancora compilabili.
 > Il README completo arriverà con la fase 6.
 
 ## Avvio in locale
@@ -36,4 +36,4 @@ Poi apri <http://localhost:5173/frfpdf/>.
 
 ## Licenza
 
-[MIT](LICENSE). Dipendenze principali: pdf.js (Apache 2.0), pdf-lib (MIT), font Source Serif 4 e IBM Plex Sans (SIL OFL).
+[MIT](LICENSE). Dipendenze principali: pdf.js (Apache 2.0), pdf-lib e @pdf-lib/fontkit (MIT), font Source Serif 4, IBM Plex Sans e Liberation Sans (SIL OFL).

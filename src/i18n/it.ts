@@ -42,7 +42,33 @@ export const it = {
   tools: {
     title: 'Strumenti',
     download: 'Scarica PDF',
+    options: 'Opzioni',
     originalUntouched: 'Il file originale non viene modificato: scarichi sempre una copia.',
+  },
+  forms: {
+    title: 'Modulo',
+    summary: (total: number, empty: number) =>
+      empty === 0
+        ? total === 1
+          ? 'Il campo è compilato.'
+          : `Tutti i ${total} campi sono compilati.`
+        : `${empty} ${empty === 1 ? 'campo da compilare' : 'campi da compilare'} su ${total}.`,
+    flatten: 'Blocca i campi compilati',
+    flattenOn: 'I valori diventano parte della pagina e non si possono più modificare.',
+    flattenOff: 'I campi restano compilabili, anche in altri programmi.',
+    today: 'Oggi',
+    todayFor: (label: string) => `Inserisci la data di oggi: ${label}`,
+    datePlaceholder: 'gg/mm/aaaa',
+    choose: '—',
+    signatureHere: 'Firma',
+    emptyWarning: (n: number) =>
+      n === 1 ? '1 campo non compilato: vuoi scaricare comunque?' : `${n} campi non compilati: vuoi scaricare comunque?`,
+    downloadAnyway: 'Scarica comunque',
+    backToForm: 'Torna al modulo',
+    xfaHybrid:
+      'Questo modulo contiene anche una versione XFA. FrFPDF usa i campi standard e la toglie dal file scaricato, così i valori si vedono in ogni programma.',
+    xfaPure:
+      'Questo modulo usa il formato XFA, che FrFPDF non supporta: i campi non si possono compilare. Aprilo con Adobe Acrobat Reader oppure chiedi a chi te l’ha inviato una versione PDF standard.',
   },
   loadErrors: {
     'not-pdf': 'Questo file non è un PDF. Scegli un file con estensione .pdf.',
@@ -56,8 +82,11 @@ export const it = {
   saveErrors: {
     encrypted:
       'L’autore di questo PDF ne ha bloccato la modifica: puoi leggerlo, ma FrFPDF non può salvarne una copia.',
+    'unsupported-characters': 'Alcuni caratteri inseriti non si possono salvare nel PDF.',
     unknown: 'Non è stato possibile creare il PDF da scaricare.',
   } satisfies Record<SaveErrorCode, string>,
+  unsupportedCharacters: (chars: string[]) =>
+    `Questi caratteri non si possono salvare nel PDF: ${chars.join(' ')}. Sostituiscili (per esempio con la lettera senza accento) e riprova.`,
   common: {
     close: 'Chiudi',
   },

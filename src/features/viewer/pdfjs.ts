@@ -1,5 +1,6 @@
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import type { PageGeometry, PdfRect } from '../../lib/pdf/coords';
 import { hasPdfHeader } from '../../lib/pdf/header';
 import { PdfLoadError } from '../../lib/pdf/loadErrors';
 
@@ -7,12 +8,14 @@ import { PdfLoadError } from '../../lib/pdf/loadErrors';
 GlobalWorkerOptions.workerSrc = workerUrl;
 
 /** Folder where build/pdfjs-assets.ts publishes CMaps, fonts and wasm decoders. */
-const assetsBase = new URL(`${import.meta.env.BASE_URL}pdfjs/`, window.location.href).href;
+export const assetsBase = new URL(`${import.meta.env.BASE_URL}pdfjs/`, window.location.href).href;
 
 export interface PageSize {
   /** Width and height in PDF points, with the page's own /Rotate applied. */
   width: number;
   height: number;
+  /** Page box and rotation, for converting between PDF and screen coordinates. */
+  geometry: PageGeometry;
 }
 
 export interface LoadedPdf {
@@ -46,8 +49,13 @@ export async function openPdf(bytes: Uint8Array): Promise<LoadedPdf> {
     const proxy = await task.promise;
     const pages: PageSize[] = [];
     for (let n = 1; n <= proxy.numPages; n++) {
-      const viewport = (await proxy.getPage(n)).getViewport({ scale: 1 });
-      pages.push({ width: viewport.width, height: viewport.height });
+      const page = await proxy.getPage(n);
+      const viewport = page.getViewport({ scale: 1 });
+      pages.push({
+        width: viewport.width,
+        height: viewport.height,
+        geometry: { view: page.view as PdfRect, rotation: page.rotate },
+      });
     }
     return { proxy, pages, close };
   } catch (error) {

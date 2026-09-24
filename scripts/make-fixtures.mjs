@@ -4,14 +4,14 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { degrees, PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { degrees, PDFDict, PDFDocument, PDFName, PDFString, rgb, StandardFonts } from 'pdf-lib';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '../tests/fixtures');
 mkdirSync(OUT, { recursive: true });
 
 const A4 = [595.28, 841.89];
 
-async function writePdf(name, build) {
+async function writePdf(name, build, postprocess) {
   const doc = await PDFDocument.create();
   // Fixed metadata so regenerated files are byte-identical.
   const epoch = new Date('2026-01-01T00:00:00Z');
@@ -20,7 +20,13 @@ async function writePdf(name, build) {
   doc.setProducer('FrFPDF fixtures');
   doc.setCreator('FrFPDF fixtures');
   await build(doc);
-  const bytes = await doc.save({ useObjectStreams: false });
+  let bytes = await doc.save({ useObjectStreams: false });
+  if (postprocess) {
+    // Second pass on the saved file, for things pdf-lib strips during save().
+    const again = await PDFDocument.load(bytes, { updateMetadata: false });
+    postprocess(again);
+    bytes = await again.save({ useObjectStreams: false, updateFieldAppearances: false });
+  }
   writeFileSync(join(OUT, name), bytes);
   return bytes;
 }
@@ -59,7 +65,129 @@ writeFileSync(join(OUT, 'not-a-pdf.pdf'), 'Questo è un file di testo, non un PD
 //    pdf-lib cannot encrypt. Standard Security Handler, revision 2 (RC4 40-bit).
 writeFileSync(join(OUT, 'protected.pdf'), makeEncryptedPdf('segreto', 'proprietario'));
 
+// 6. AcroForm with every field type, on two pages.
+await writePdf('acroform.pdf', async (doc) => {
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const form = doc.getForm();
+  const p1 = doc.addPage(A4);
+  const label = (page, text, x, y) => page.drawText(text, { x, y, size: 10, font });
+  p1.drawText('Modulo di iscrizione', { x: 72, y: 780, size: 20, font });
+
+  label(p1, 'Nome', 72, 730);
+  form.createTextField('nome').addToPage(p1, { x: 160, y: 724, width: 160, height: 20 });
+  label(p1, 'Cognome', 340, 730);
+  form.createTextField('cognome').addToPage(p1, { x: 400, y: 724, width: 120, height: 20 });
+
+  label(p1, 'Codice fiscale', 72, 690);
+  const cf = form.createTextField('codice_fiscale');
+  cf.setMaxLength(16);
+  cf.addToPage(p1, { x: 160, y: 684, width: 200, height: 20 });
+
+  label(p1, 'Data di nascita', 72, 650);
+  form.createTextField('data_nascita').addToPage(p1, { x: 160, y: 644, width: 100, height: 20 });
+
+  label(p1, 'Email', 72, 610);
+  const email = form.createTextField('email');
+  email.setText('mario.rossi@example.com');
+  email.addToPage(p1, { x: 160, y: 604, width: 200, height: 20 });
+
+  label(p1, 'Provincia', 72, 570);
+  const prov = form.createDropdown('provincia');
+  prov.addOptions(['Milano', 'Roma', 'Torino', 'Napoli']);
+  prov.addToPage(p1, { x: 160, y: 564, width: 120, height: 20 });
+
+  label(p1, 'Tipo di iscrizione', 72, 530);
+  const tipo = form.createRadioGroup('tipo');
+  label(p1, 'Ordinaria', 182, 530);
+  tipo.addOptionToPage('ordinaria', p1, { x: 160, y: 526, width: 14, height: 14 });
+  label(p1, 'Ridotta', 282, 530);
+  tipo.addOptionToPage('ridotta', p1, { x: 260, y: 526, width: 14, height: 14 });
+
+  label(p1, 'Note', 72, 490);
+  const note = form.createTextField('note');
+  note.enableMultiline();
+  note.addToPage(p1, { x: 160, y: 400, width: 360, height: 100 });
+
+  label(p1, 'Codice pratica (sola lettura)', 72, 360);
+  const code = form.createTextField('codice_pratica');
+  code.setText('PR-2026-001');
+  code.enableReadOnly();
+  code.addToPage(p1, { x: 240, y: 354, width: 120, height: 20 });
+
+  const privacy = form.createCheckBox('privacy');
+  privacy.addToPage(p1, { x: 72, y: 316, width: 14, height: 14 });
+  label(p1, 'Acconsento al trattamento dei dati', 94, 320);
+
+  const p2 = doc.addPage(A4);
+  label(p2, 'Luogo', 72, 760);
+  form.createTextField('luogo').addToPage(p2, { x: 160, y: 754, width: 160, height: 20 });
+  label(p2, 'Data', 72, 720);
+  form.createTextField('data').addToPage(p2, { x: 160, y: 714, width: 100, height: 20 });
+  label(p2, 'Firma', 72, 660);
+  addSignatureField(doc, p2, 'firma', [160, 620, 400, 680]);
+});
+
+// 7. AcroForm on a page with /Rotate 90.
+await writePdf('acroform-rotated.pdf', async (doc) => {
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage(A4);
+  page.drawText('Nome', { x: 72, y: 730, size: 10, font });
+  doc.getForm().createTextField('nome').addToPage(page, { x: 160, y: 724, width: 160, height: 20 });
+  page.setRotation(degrees(90));
+});
+
+// 8. Hybrid XFA: standard AcroForm fields plus an XFA packet.
+await writePdf('xfa-hybrid.pdf', async (doc) => {
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage(A4);
+  page.drawText('Nome', { x: 72, y: 730, size: 10, font });
+  const form = doc.getForm();
+  form.createTextField('nome').addToPage(page, { x: 160, y: 724, width: 160, height: 20 });
+}, addXfaPacket);
+
+// 9. Pure XFA: no AcroForm fields, only the XFA packet and a placeholder page.
+await writePdf('xfa-pure.pdf', async (doc) => {
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage(A4);
+  page.drawText('Please wait... this document requires an XFA-capable viewer.', { x: 72, y: 760, size: 12, font });
+}, addXfaPacket);
+
 console.log(`Fixtures written to ${OUT}`);
+
+// ---------------------------------------------------------------------------
+
+/** pdf-lib cannot create signature fields: build the widget dictionary by hand. */
+function addSignatureField(doc, page, name, rect) {
+  const form = doc.getForm();
+  const ref = doc.context.register(
+    doc.context.obj({
+      FT: 'Sig',
+      T: PDFString.of(name),
+      Type: 'Annot',
+      Subtype: 'Widget',
+      Rect: rect,
+      F: 4,
+      P: page.ref,
+    }),
+  );
+  page.node.addAnnot(ref);
+  form.acroForm.addField(ref);
+}
+
+function addXfaPacket(doc) {
+  const xdp =
+    '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/"><template xmlns="http://www.xfa.org/schema/xfa-template/3.3/">' +
+    '<subform name="form1"><field name="nome"/></subform></template></xdp:xdp>';
+  // Work on the raw catalog: pdf-lib's getForm() would delete the XFA packet.
+  const stream = doc.context.register(doc.context.stream(xdp));
+  let acroForm = doc.catalog.lookupMaybe(PDFName.of('AcroForm'), PDFDict);
+  if (!acroForm) {
+    acroForm = doc.context.obj({ Fields: [] });
+    doc.catalog.set(PDFName.of('AcroForm'), doc.context.register(acroForm));
+  }
+  acroForm.set(PDFName.of('XFA'), stream);
+}
 
 // ---------------------------------------------------------------------------
 

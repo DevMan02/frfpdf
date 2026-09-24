@@ -15,8 +15,9 @@ export default defineConfig({
     // Keep source maps out of the public build: smaller download, nothing hidden
     // (the source is public on GitHub anyway).
     sourcemap: false,
-    // pdf.js alone is ~450 kB; pdf-lib is split out and loaded on first save.
-    chunkSizeWarningLimit: 800,
+    // pdf.js alone is ~450 kB. pdf-lib + fontkit (~1.1 MB) are split out and
+    // loaded only on the first "Scarica PDF", from the same origin.
+    chunkSizeWarningLimit: 1200,
   },
   preview: {
     port: 4173,

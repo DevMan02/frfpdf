@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { t } from '../../i18n';
 import { PageCanvas } from './PageCanvas';
 import type { LoadedPdf } from './pdfjs';
@@ -13,11 +13,13 @@ interface ViewerProps {
   scrollRef: RefObject<HTMLDivElement | null>;
   onCurrentPageChange: (page: number) => void;
   onWidthChange: (width: number) => void;
+  /** Extra layer drawn over each page (form fields, later signatures). `scale` = CSS px per PDF point. */
+  renderOverlay?: (pageIndex: number, scale: number) => ReactNode;
 }
 
 export const pageElementId = (page: number) => `pagina-${page}`;
 
-export function Viewer({ doc, zoom, scrollRef, onCurrentPageChange, onWidthChange }: ViewerProps) {
+export function Viewer({ doc, zoom, scrollRef, onCurrentPageChange, onWidthChange, renderOverlay }: ViewerProps) {
   const scale = zoom * PDF_TO_CSS;
   const total = doc.pages.length;
   // Relative scroll position, used to keep the same spot visible when zooming.
@@ -81,7 +83,9 @@ export function Viewer({ doc, zoom, scrollRef, onCurrentPageChange, onWidthChang
                 releaseWhenHidden
                 className="sheet"
                 label={t.viewer.pageLabel(n, total)}
+                separateForms={!!renderOverlay}
               />
+              {renderOverlay?.(index, scale)}
             </div>
           );
         })}

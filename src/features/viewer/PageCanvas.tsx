@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
+import { AnnotationMode, type PDFDocumentProxy, type RenderTask } from 'pdfjs-dist';
 
 /** Hard cap on canvas size: very large canvases fail silently on mobile browsers. */
 const MAX_CANVAS_PIXELS = 16_777_216;
@@ -19,6 +19,11 @@ interface PageCanvasProps {
   className?: string;
   /** Accessible name; leave empty for decorative copies such as thumbnails. */
   label?: string;
+  /**
+   * true: form fields are left out of the bitmap because FrFPDF draws its own
+   * editable fields on top (read-only fields and signatures are still drawn).
+   */
+  separateForms?: boolean;
 }
 
 /**
@@ -36,6 +41,7 @@ export function PageCanvas({
   releaseWhenHidden = false,
   className,
   label,
+  separateForms = false,
 }: PageCanvasProps) {
   const holderRef = useRef<HTMLDivElement>(null);
   const [nearScreen, setNearScreen] = useState(false);
@@ -75,7 +81,11 @@ export function PageCanvas({
       canvas.height = Math.floor(viewport.height);
       canvas.setAttribute('aria-hidden', 'true');
 
-      task = page.render({ canvas, viewport });
+      task = page.render({
+        canvas,
+        viewport,
+        annotationMode: separateForms ? AnnotationMode.ENABLE_FORMS : AnnotationMode.ENABLE,
+      });
       try {
         await task.promise;
       } catch (error) {
@@ -89,7 +99,7 @@ export function PageCanvas({
       cancelled = true;
       task?.cancel();
     };
-  }, [pdf, pageNumber, scale, nearScreen, releaseWhenHidden]);
+  }, [pdf, pageNumber, scale, nearScreen, releaseWhenHidden, separateForms]);
 
   return (
     <div

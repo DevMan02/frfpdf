@@ -434,6 +434,159 @@ button {
   min-width: 100%;
 }
 
+.viewer__page {
+  position: relative;
+}
+
+/* ==========================================================================
+   Form fields drawn over the page
+   Fields sit on white paper in both themes: colours are fixed, not tokens.
+   ========================================================================== */
+.field-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.field {
+  --field-tint: rgb(47 79 158 / 0.08);
+  --field-line: rgb(47 79 158 / 0.55);
+  position: absolute;
+  pointer-events: auto;
+  transform-origin: center;
+}
+
+.field__input {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--field-line);
+  border-radius: 0;
+  background: var(--field-tint);
+  color: #1e2638;
+  line-height: 1.15;
+  outline: none;
+}
+
+.field__input--multiline {
+  border: 1px solid var(--field-line);
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+
+.field__select {
+  cursor: pointer;
+}
+
+.field__input:hover {
+  background: rgb(47 79 158 / 0.14);
+}
+
+.field__input:focus-visible,
+.field__input:focus {
+  background: #ffffff;
+  box-shadow: 0 0 0 2px #2f4f9e;
+}
+
+.field__input::placeholder {
+  color: rgb(30 38 56 / 0.35);
+}
+
+/* "Oggi" button, shown next to a date field while it is in use. */
+.field__today {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 4px);
+  transform: translateY(-50%);
+  padding: 2px 8px;
+  border: 1px solid #2f4f9e;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #2f4f9e;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.field--date:focus-within .field__today {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.field__today:focus-visible {
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #2f4f9e;
+}
+
+.field--toggle {
+  display: grid;
+  place-items: center;
+}
+
+.field__check {
+  appearance: none;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 1px solid var(--field-line);
+  background: var(--field-tint);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.field__check--radio {
+  border-radius: 50%;
+}
+
+.field__check::after {
+  content: '';
+  width: 60%;
+  height: 60%;
+  background: #1e2638;
+  transform: scale(0);
+  transition: transform 80ms ease;
+}
+
+.field__check:not(.field__check--radio)::after {
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+}
+
+.field__check--radio::after {
+  border-radius: 50%;
+}
+
+.field__check:checked::after {
+  transform: scale(1);
+}
+
+.field__check:focus-visible {
+  box-shadow: 0 0 0 2px #2f4f9e;
+}
+
+.field__check:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.field--signature {
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgb(47 79 158 / 0.6);
+  background: rgb(47 79 158 / 0.04);
+  color: rgb(47 79 158 / 0.8);
+  font-family: var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
 /* ---- Tools ---- */
 .tools {
   display: flex;
@@ -446,9 +599,51 @@ button {
   overflow-y: auto;
 }
 
+.tools__toggle {
+  display: none;
+}
+
 .tools__meta {
   color: var(--graphite);
   font-size: 0.875rem;
+}
+
+.tools__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--thread);
+}
+
+.tools__heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.tools__progress {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Checkbox with its label, sized for touch. */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.switch input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  accent-color: var(--pen);
+  cursor: pointer;
 }
 
 .tools__footer {
@@ -517,6 +712,42 @@ button {
 .notice p {
   flex: 1;
   padding-top: 0.35rem;
+}
+
+.notice--info {
+  border-color: var(--pen);
+  background: var(--paper);
+}
+
+/* ==========================================================================
+   Dialog
+   ========================================================================== */
+.dialog {
+  width: min(calc(100% - 2rem), 26rem);
+  padding: 1.5rem;
+  border: 1px solid var(--thread);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow-sheet);
+}
+
+.dialog::backdrop {
+  background: rgb(16 19 27 / 0.45);
+}
+
+.dialog__title {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  line-height: 1.35;
+}
+
+.dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
 }
 
 .drop-overlay {
@@ -613,13 +844,43 @@ button {
     overflow: visible;
   }
 
-  .tools__body,
-  .tools__hint {
+  .tools {
+    flex-wrap: wrap;
+  }
+
+  .tools__hint,
+  .tools__meta {
     display: none;
+  }
+
+  .tools__toggle {
+    display: inline-flex;
+    order: 1;
+  }
+
+  .tools__body {
+    display: none;
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .tools__body--open {
+    display: block;
+    max-height: 45dvh;
+    overflow-y: auto;
+  }
+
+  .tools__body--open .tools__hint {
+    display: block;
+  }
+
+  .tools__section {
+    margin-top: 0;
   }
 
   .tools__footer {
     flex: 1;
+    order: 2;
     flex-direction: row;
     align-items: center;
     flex-wrap: wrap;
