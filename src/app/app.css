@@ -1,0 +1,650 @@
+/* ==========================================================================
+   FrFPDF — design tokens
+   Paper, ink and pen: the tools of a signed document.
+   ========================================================================== */
+:root {
+  --paper: #f5f1e8; /* panels, welcome background */
+  --desk: #e9e3d6; /* surface the pages rest on */
+  --sheet: #ffffff; /* the PDF page itself */
+  --ink: #1e2638; /* text */
+  --pen: #2f4f9e; /* primary actions, focus, links */
+  --pen-hover: #243f82;
+  --on-pen: #ffffff;
+  --seal: #9e3b2c; /* errors only */
+  --seal-bg: #f7e4df;
+  --graphite: #62666e; /* secondary text */
+  --thread: #dad3c4; /* borders and rules */
+
+  --font-display: 'Source Serif 4 Variable', 'Source Serif 4', Georgia, serif;
+  --font-ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --radius: 6px;
+  --shadow-sheet: 0 1px 2px rgb(30 38 56 / 0.12), 0 4px 14px rgb(30 38 56 / 0.08);
+  --focus-ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--pen);
+
+  --thumbs-width: 136px;
+  --tools-width: 272px;
+  --toolbar-height: 56px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #171b26;
+    --desk: #10131b;
+    --sheet: #ffffff; /* pages stay white: it is what will be printed */
+    --ink: #ece7dc;
+    --pen: #9bb2ee;
+    --pen-hover: #b6c7f3;
+    --on-pen: #10131b;
+    --seal: #eb9a88;
+    --seal-bg: #3a2220;
+    --graphite: #a7abb3;
+    --thread: #2f3546;
+    --shadow-sheet: 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 18px rgb(0 0 0 / 0.35);
+    color-scheme: dark;
+  }
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 1.1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.button--primary {
+  background: var(--pen);
+  color: var(--on-pen);
+}
+
+.button--primary:not(:disabled):hover {
+  background: var(--pen-hover);
+}
+
+.button--quiet {
+  background: transparent;
+  border-color: var(--thread);
+}
+
+.button--quiet:hover {
+  border-color: var(--graphite);
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  cursor: pointer;
+}
+
+.icon-button:not(:disabled):hover {
+  background: var(--desk);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.icon-button[aria-pressed='true'] {
+  color: var(--pen);
+  background: var(--desk);
+}
+
+/* ==========================================================================
+   Welcome
+   ========================================================================== */
+.welcome {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5rem;
+  padding: 3rem 1rem;
+}
+
+.welcome__header {
+  text-align: center;
+  max-width: 34rem;
+}
+
+.welcome__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 650;
+  font-size: clamp(3rem, 9vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.welcome__tagline {
+  display: block;
+  margin-top: 0.6rem;
+  font-weight: 400;
+  font-style: normal;
+  font-size: clamp(1.1rem, 3vw, 1.4rem);
+  letter-spacing: 0.01em;
+  color: var(--graphite);
+}
+
+.welcome__lead {
+  margin-top: 1.25rem;
+  font-size: 1.05rem;
+}
+
+/* The signature element: a sheet with a "sign here" line as drop target. */
+.welcome__sheet {
+  /* The sheet is paper in both themes: keep light-theme ink and pen on it. */
+  --pen: #2f4f9e;
+  --pen-hover: #243f82;
+  --on-pen: #ffffff;
+  --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #2f4f9e;
+  width: min(100%, 34rem);
+  padding: 3rem 2.5rem 2.25rem;
+  background: var(--sheet);
+  color: #1e2638;
+  border-radius: 2px;
+  box-shadow: var(--shadow-sheet);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sign-line {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 0.75rem;
+  align-items: end;
+}
+
+.sign-line__mark {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  line-height: 1;
+  color: #2f4f9e;
+}
+
+.sign-line__rule {
+  height: 0;
+  border-bottom: 1.5px solid #1e2638;
+  margin-bottom: 0.3rem;
+}
+
+.sign-line__label {
+  grid-column: 2;
+  padding-top: 0.4rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #62666e;
+}
+
+.welcome__or {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: #62666e;
+}
+
+.welcome__privacy {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 34rem;
+  text-align: left;
+}
+
+.welcome__privacy svg {
+  flex: none;
+  color: var(--pen);
+}
+
+.welcome__privacy strong {
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   App shell: toolbar + thumbnails | document | tools
+   ========================================================================== */
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: var(--toolbar-height) minmax(0, 1fr);
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--thread);
+  background: var(--paper);
+}
+
+.toolbar__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.toolbar__logo {
+  font-family: var(--font-display);
+  font-weight: 650;
+  font-size: 1.3rem;
+}
+
+.toolbar__file {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--graphite);
+}
+
+.toolbar__page {
+  font-size: 0.875rem;
+  color: var(--graphite);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.toolbar__zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.toolbar__zoom-value {
+  min-width: 3.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: var(--thumbs-width) minmax(0, 1fr) var(--tools-width);
+  min-height: 0;
+}
+
+.workspace__main {
+  min-width: 0;
+  min-height: 0;
+  background: var(--desk);
+}
+
+/* A rendered PDF page. */
+.sheet {
+  background: var(--sheet);
+  box-shadow: var(--shadow-sheet);
+}
+
+.sheet canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Thumbnails ---- */
+.thumbs {
+  overflow-y: auto;
+  border-right: 1px solid var(--thread);
+  background: var(--paper);
+}
+
+.thumbs__list {
+  list-style: none;
+  margin: 0;
+  padding: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.thumbs__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  cursor: pointer;
+}
+
+.thumbs__item .sheet {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.thumbs__item:hover .sheet {
+  outline-color: var(--thread);
+}
+
+.thumbs__item[aria-current='page'] .sheet {
+  outline-color: var(--pen);
+}
+
+.thumbs__number {
+  font-size: 0.75rem;
+  color: var(--graphite);
+  font-variant-numeric: tabular-nums;
+}
+
+.thumbs__item[aria-current='page'] .thumbs__number {
+  color: var(--pen);
+  font-weight: 600;
+}
+
+/* ---- Document ---- */
+.viewer {
+  height: 100%;
+  overflow: auto;
+}
+
+.viewer__pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem 24px 3rem;
+  width: max-content;
+  min-width: 100%;
+}
+
+/* ---- Tools ---- */
+.tools {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem;
+  border-left: 1px solid var(--thread);
+  background: var(--paper);
+  overflow-y: auto;
+}
+
+.tools__meta {
+  color: var(--graphite);
+  font-size: 0.875rem;
+}
+
+.tools__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tools__download {
+  width: 100%;
+}
+
+.tools__hint {
+  font-size: 0.8125rem;
+  color: var(--graphite);
+}
+
+.tools__status {
+  font-size: 0.8125rem;
+  color: var(--pen);
+  min-height: 1.2em;
+}
+
+.tools__status:empty {
+  display: none;
+}
+
+.privacy-note {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--thread);
+  font-size: 0.8125rem;
+  color: var(--graphite);
+}
+
+.privacy-note svg {
+  flex: none;
+  margin-top: 0.15rem;
+  color: var(--pen);
+}
+
+/* ==========================================================================
+   Error notice and drop overlay
+   ========================================================================== */
+.notice {
+  position: fixed;
+  z-index: 20;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100% - 2rem), 36rem);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 0.75rem 0.85rem 1rem;
+  border: 1px solid var(--seal);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: var(--seal-bg);
+  color: var(--ink);
+  box-shadow: var(--shadow-sheet);
+}
+
+.notice p {
+  flex: 1;
+  padding-top: 0.35rem;
+}
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgb(47 79 158 / 0.12);
+  outline: 3px dashed var(--pen);
+  outline-offset: -12px;
+  pointer-events: none;
+}
+
+.drop-overlay p {
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius);
+  background: var(--pen);
+  color: var(--on-pen);
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   Small screens: no thumbnails, tools become a bottom bar
+   ========================================================================== */
+@media (max-width: 1024px) {
+  :root {
+    --tools-width: 232px;
+    --thumbs-width: 112px;
+  }
+
+  .toolbar__open span {
+    display: none;
+  }
+
+  .toolbar__open {
+    padding: 0 0.75rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .app {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'brand zoom open'
+      'page page page';
+    gap: 0.25rem 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .toolbar__brand {
+    grid-area: brand;
+  }
+  .toolbar__zoom {
+    grid-area: zoom;
+  }
+  .toolbar__open {
+    grid-area: open;
+  }
+  .toolbar__page {
+    grid-area: page;
+    font-size: 0.8125rem;
+  }
+
+  .toolbar__file {
+    display: none;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .thumbs {
+    display: none;
+  }
+
+  .viewer__pages {
+    padding: 1rem 12px 2rem;
+    gap: 1rem;
+  }
+
+  .tools {
+    flex-direction: row;
+    align-items: center;
+    padding: 0.75rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    border-left: 0;
+    border-top: 1px solid var(--thread);
+    overflow: visible;
+  }
+
+  .tools__body,
+  .tools__hint {
+    display: none;
+  }
+
+  .tools__footer {
+    flex: 1;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .tools__download {
+    width: auto;
+    order: 2;
+  }
+
+  .tools__privacy {
+    flex: 1;
+    min-width: 12rem;
+    order: 1;
+    padding-top: 0;
+    border-top: 0;
+    font-size: 0.75rem;
+  }
+
+  .tools__status {
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .welcome__sheet {
+    padding: 2.25rem 1.5rem 1.75rem;
+  }
+}
