@@ -231,6 +231,36 @@ export function inkBounds(bmp: Bitmap, box: PxBox): PxBox | null {
   return { x1: minX, y1: minY, x2: maxX + 1, y2: maxY + 1 };
 }
 
+/**
+ * Horizontal bands of written rows inside a box (rows with at least 2 ink
+ * pixels), separated by at least `minGap` blank rows. Used to tell a small
+ * caption at the top of a cell from the value written below it.
+ */
+export function inkBands(bmp: Bitmap, box: PxBox, minGap: number): { y1: number; y2: number }[] {
+  const x1 = Math.max(0, Math.floor(box.x1));
+  const y1 = Math.max(0, Math.floor(box.y1));
+  const x2 = Math.min(bmp.width, Math.ceil(box.x2));
+  const y2 = Math.min(bmp.height, Math.ceil(box.y2));
+  const bands: { y1: number; y2: number }[] = [];
+  let start = -1;
+  let last = -1;
+  for (let y = y1; y <= y2; y++) {
+    let count = 0;
+    if (y < y2) {
+      const offset = y * bmp.width;
+      for (let x = x1; x < x2; x++) count += bmp.ink[offset + x]!;
+    }
+    if (count >= 2) {
+      if (start < 0) start = y;
+      last = y;
+    } else if (start >= 0 && (y - last > minGap || y === y2)) {
+      bands.push({ y1: start, y2: last + 1 });
+      start = -1;
+    }
+  }
+  return bands;
+}
+
 export interface BoxOptions {
   minSize: number;
   maxSize: number;

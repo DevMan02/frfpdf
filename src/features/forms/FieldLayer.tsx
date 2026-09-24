@@ -144,11 +144,14 @@ function FieldBox({ field, style, size, scale, value, onChange, onLeaveEmpty }: 
   const onBlur = () => {
     if (field.source === 'manual' && isEmptyValue(value)) onLeaveEmpty?.(field);
   };
+  // Over existing content: see-through until something is typed, then the
+  // white box that will hide the old content in the saved PDF.
+  const cover = field.cover ? ` field--cover${text ? ' has-value' : ''}` : '';
 
   switch (field.kind) {
     case 'text':
       return (
-        <div className="field" style={style}>
+        <div className={`field${cover}`} style={style}>
           <input
             id={id}
             type="text"
@@ -166,7 +169,7 @@ function FieldBox({ field, style, size, scale, value, onChange, onLeaveEmpty }: 
 
     case 'date':
       return (
-        <div className="field field--date" style={style}>
+        <div className={`field field--date${cover}`} style={style}>
           <input
             id={id}
             type="text"
@@ -193,7 +196,7 @@ function FieldBox({ field, style, size, scale, value, onChange, onLeaveEmpty }: 
 
     case 'multiline':
       return (
-        <div className="field" style={style}>
+        <div className={`field${cover}`} style={style}>
           <textarea
             id={id}
             className="field__input field__input--multiline"

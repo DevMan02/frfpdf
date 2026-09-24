@@ -30,6 +30,13 @@ export interface DetectedField {
   /** Nearby text that names the field ('' when none, e.g. on scans). */
   label: string;
   origin: DetectedOrigin;
+  /**
+   * Something is already written there (e.g. "Mancardi Devin" under the
+   * caption "Full legal name"). Editing it covers the old content.
+   */
+  prefilled?: boolean;
+  /** The text already written, when it can be read (vector PDFs). */
+  value?: string;
 }
 
 export interface DetectionInput {
@@ -44,6 +51,8 @@ export interface DetectionInput {
   occupied?: (box: Box) => boolean;
   /** Scans only: where the ink is inside a box (to find a caption on top of an empty cell). */
   inkBounds?: (box: Box) => Box | null;
+  /** Scans only: bands of written rows inside a box, top to bottom. */
+  inkBands?: (box: Box) => { y1: number; y2: number }[];
 }
 
 /** Tolerance when matching line ends and edges, in points. */
@@ -75,7 +84,7 @@ export function detectFields(input: DetectionInput): DetectedField[] {
     label: labelRightOf(b, texts),
     origin: 'box',
   }));
-  const fromCells = classifyCells(cells, texts, isFree, input.inkBounds);
+  const fromCells = classifyCells(cells, texts, isFree, input.inkBounds, input.inkBands);
   const fromLines = freeLineFields(hs, vs, cells, texts, hasText, occupied);
 
   // Earlier sources win when two candidates overlap.
@@ -222,22 +231,25 @@ function classifyCells(
   texts: TextRun[],
   isFree: (b: Box) => boolean,
   inkBoundsOf?: (b: Box) => Box | null,
+  inkBandsOf?: (b: Box) => { y1: number; y2: number }[],
 ): DetectedField[] {
   const fields: DetectedField[] = [];
   for (const cell of cells) {
     const inside = textsInside(cell, texts);
     if (!inside.length) {
       if (!isFree(inset(cell, 2))) {
-        // Scans: a small caption printed at the top of an otherwise empty cell.
-        const ink = inkBoundsOf?.(inset(cell, 2));
-        if (ink && ink.y2 - cell.y1 < Math.max(14, 0.45 * height(cell))) {
-          const below: Box = { x1: cell.x1 + 1, y1: ink.y2 + 1.5, x2: cell.x2 - 1, y2: cell.y2 - 1 };
-          if (height(below) >= 10 && width(below) >= 30 && isFree(below)) {
+        // Scans: a small caption printed at the top of the cell, with the
+        // room below either empty (a field to fill) or written (prefilled).
+        const caption = scannedCaption(cell, inkBoundsOf, inkBandsOf);
+        if (caption !== null) {
+          const below: Box = { x1: cell.x1 + 1, y1: caption + 1.5, x2: cell.x2 - 1, y2: cell.y2 - 1 };
+          if (height(below) >= 10 && width(below) >= 30) {
             fields.push({
               box: below,
               kind: height(below) >= MULTILINE_MIN_HEIGHT ? 'multiline' : 'text',
               label: '',
               origin: 'cell',
+              prefilled: !isFree(below),
             });
           }
         }
@@ -255,6 +267,33 @@ function classifyCells(
         origin: 'cell',
       });
       continue;
+    }
+
+    // A small caption on top and a value below it ("Restrizioni alimentari"
+    // over "Nessuna"): a prefilled field that can be corrected.
+    const lines = textLines(inside);
+    if (lines.length >= 2) {
+      const captionBox = union(lines[0]!.map(textBox));
+      const valueTexts = lines.slice(1).flat();
+      const captionIsSmall = lines[0]!.every((t) => valueTexts.every((v) => t.size <= v.size + 0.5));
+      if (captionIsSmall && captionBox.y2 - cell.y1 < 0.5 * height(cell)) {
+        const below: Box = { x1: cell.x1 + 1, y1: captionBox.y2 + 1, x2: cell.x2 - 1, y2: cell.y2 - 1 };
+        if (height(below) >= 10 && width(below) >= 30) {
+          const multiline = height(below) >= MULTILINE_MIN_HEIGHT;
+          fields.push({
+            box: below,
+            kind: multiline ? 'multiline' : 'text',
+            label: joinTexts(lines[0]!),
+            origin: 'cell',
+            prefilled: true,
+            value: lines
+              .slice(1)
+              .map((line) => joinTexts(line))
+              .join(multiline ? '\n' : ' '),
+          });
+          continue;
+        }
+      }
     }
 
     // A label inside the cell, with room left to write: below a small caption
@@ -278,6 +317,37 @@ function classifyCells(
     }
   }
   return fields;
+}
+
+/** Text runs grouped into lines (same baseline), top to bottom. */
+function textLines(texts: TextRun[]): TextRun[][] {
+  const lines: TextRun[][] = [];
+  for (const t of [...texts].sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const line = lines.find((l) => Math.abs(l[0]!.y - t.y) < 2);
+    if (line) line.push(t);
+    else lines.push([t]);
+  }
+  return lines;
+}
+
+/**
+ * Scans: bottom of a caption printed at the top of the cell, or null. The
+ * caption is the first band of written rows, short and in the upper part.
+ */
+function scannedCaption(
+  cell: Box,
+  inkBoundsOf?: (b: Box) => Box | null,
+  inkBandsOf?: (b: Box) => { y1: number; y2: number }[],
+): number | null {
+  const inner = inset(cell, 2);
+  const bands = inkBandsOf?.(inner);
+  if (bands?.length) {
+    const first = bands[0]!;
+    const isCaption = first.y2 - first.y1 < 10 && first.y2 - cell.y1 < Math.max(14, 0.5 * height(cell));
+    return isCaption ? first.y2 : null;
+  }
+  const ink = inkBoundsOf?.(inner);
+  return ink && ink.y2 - cell.y1 < Math.max(14, 0.45 * height(cell)) ? ink.y2 : null;
 }
 
 /** Row label (cell on the left) and column header (cell above), as "Row — Column". */

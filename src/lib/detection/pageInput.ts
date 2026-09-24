@@ -1,6 +1,6 @@
 import type { DetectionInput } from './detect';
 import type { Box, TextRun } from './geometry';
-import { findBoxes, findLines, hasWriting, inkBounds, type Bitmap } from './raster';
+import { findBoxes, findLines, hasWriting, inkBands, inkBounds, type Bitmap } from './raster';
 import type { VectorPrimitives } from './vector';
 
 /** A page is treated as a scan when an image covers most of it and there are (almost) no drawn lines. */
@@ -52,5 +52,7 @@ export function rasterInput(
       const b = inkBounds(bitmap, toPx(box));
       return b && { x1: toPt(b.x1), y1: toPt(b.y1), x2: toPt(b.x2), y2: toPt(b.y2) };
     },
+    inkBands: (box: Box) =>
+      inkBands(bitmap, toPx(box), Math.round(1.5 * pxPerPt)).map((b) => ({ y1: toPt(b.y1), y2: toPt(b.y2) })),
   };
 }

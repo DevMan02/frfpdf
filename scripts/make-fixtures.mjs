@@ -285,6 +285,15 @@ function drawScannedForm() {
   words(520, 520, 120);
   words(820, 520, 110);
 
+  // A row of two cells with a small caption on top: the first one already
+  // filled in (a correction field), the second one still empty.
+  hline(150, 1093, 710);
+  hline(150, 1093, 770);
+  for (const x of [150, 600, 1090]) vline(710, 773, x);
+  words(170, 716, 90, 8); // caption
+  words(170, 740, 200, 20); // value already written
+  words(620, 716, 90, 8); // caption only
+
   rect(150, 800, 176, 826); // checkbox
   words(190, 804, 60);
   rect(300, 800, 326, 826);

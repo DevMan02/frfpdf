@@ -491,6 +491,20 @@ button {
   box-shadow: 0 0 0 2px #2f4f9e;
 }
 
+/* Fields over existing content (corrections). */
+.field--cover .field__input {
+  border: 1px dashed rgb(158 59 44 / 0.7);
+  background: transparent;
+}
+
+.field--cover:not(.has-value) .field__input:focus {
+  background: rgb(255 255 255 / 0.25);
+}
+
+.field--cover.has-value .field__input {
+  background: #ffffff;
+}
+
 .field__input::placeholder {
   color: rgb(30 38 56 / 0.35);
 }
@@ -735,6 +749,11 @@ button {
 
 .tools__edit {
   align-self: flex-start;
+}
+
+.tools__note {
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--seal);
 }
 
 .tools__edit[aria-pressed='true'] {

@@ -63,6 +63,12 @@ export const it = {
         ? 'Trovato 1 spazio da compilare: controllalo prima di scaricare.'
         : `Trovati ${n} spazi da compilare: controllali prima di scaricare.`,
     noneDetected: 'Nessuno spazio da compilare trovato automaticamente.',
+    detectedPrefilled: (n: number) =>
+      n === 1
+        ? '1 campo è già compilato: per correggerlo, scrivici sopra.'
+        : `${n} campi sono già compilati: per correggerli, scrivici sopra.`,
+    coverNote:
+      'Le correzioni coprono il contenuto originale con un riquadro bianco. Il vecchio contenuto resta nel file sotto il riquadro: non si vede, ma chi usa programmi di modifica PDF può recuperarlo.',
     clickToWrite: 'Clicca sulla pagina dove vuoi scrivere.',
     scanned: 'Documento scansionato: clicca dove vuoi scrivere.',
     editFields: 'Modifica campi',
@@ -70,11 +76,13 @@ export const it = {
     addKind: 'Al clic sulla pagina aggiungi',
     addText: 'Testo',
     addCheckbox: 'Casella',
+    addCover: 'Sostituisci',
     editHelp:
-      'Trascina un campo per spostarlo e l’angolo per ridimensionarlo. Da tastiera: frecce per spostare, Alt+frecce per ridimensionare, Canc per eliminare.',
+      'Trascina un campo per spostarlo e l’angolo per ridimensionarlo. Da tastiera: frecce per spostare, Alt+frecce per ridimensionare, Canc per eliminare. «Sostituisci» crea un campo sopra un testo già scritto, per correggerlo.',
     editFieldLabel: (label: string, kind: string) => `${label}, ${kind}`,
     removeField: (label: string) => `Elimina ${label}`,
     genericLabel: (n: number) => `Campo ${n}`,
+    coverLabel: (n: number) => `Correzione ${n}`,
     kinds: {
       text: 'campo di testo',
       multiline: 'testo su più righe',

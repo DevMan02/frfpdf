@@ -5,12 +5,15 @@ import type { XfaStatus } from '../features/forms/readForm';
 import { Icon } from './Icon';
 import { PrivacyNote } from './PrivacyNote';
 
-export type AddKind = 'text' | 'checkbox';
+/** What a click on the page adds in "Modifica campi". 'cover' writes over existing content. */
+export type AddKind = 'text' | 'checkbox' | 'cover';
 
 /** Flat documents: fields found automatically, editable by the user. */
 export interface DetectionSummary {
   running: boolean;
   found: number;
+  /** Detected areas that already contain something (they can be corrected). */
+  prefilled: number;
   editing: boolean;
   addKind: AddKind;
   onToggleEditing: () => void;
@@ -22,6 +25,8 @@ export interface FormSummary {
   empty: number;
   flatten: boolean;
   xfa: XfaStatus;
+  /** Some fields write over existing content: explain how. */
+  covers: boolean;
   onFlattenChange: (flatten: boolean) => void;
   /** Present for documents without real form fields. */
   detection: DetectionSummary | null;
@@ -73,6 +78,9 @@ export function ToolPanel({ pageCount, form, saving, status, onDownload }: ToolP
                     : t.forms.noneDetected}
               </p>
             )}
+            {detection && !detection.running && detection.prefilled > 0 && (
+              <p className="tools__hint">{t.forms.detectedPrefilled(detection.prefilled)}</p>
+            )}
 
             {form.total > 0 && (
               <p className="tools__progress" aria-live="polite">
@@ -95,7 +103,7 @@ export function ToolPanel({ pageCount, form, saving, status, onDownload }: ToolP
                   <>
                     <fieldset className="segmented">
                       <legend>{t.forms.addKind}</legend>
-                      {(['text', 'checkbox'] as const).map((kind) => (
+                      {(['text', 'checkbox', 'cover'] as const).map((kind) => (
                         <label key={kind}>
                           <input
                             type="radio"
@@ -103,7 +111,7 @@ export function ToolPanel({ pageCount, form, saving, status, onDownload }: ToolP
                             checked={detection.addKind === kind}
                             onChange={() => detection.onAddKindChange(kind)}
                           />
-                          <span>{kind === 'text' ? t.forms.addText : t.forms.addCheckbox}</span>
+                          <span>{{ text: t.forms.addText, checkbox: t.forms.addCheckbox, cover: t.forms.addCover }[kind]}</span>
                         </label>
                       ))}
                     </fieldset>
@@ -130,6 +138,8 @@ export function ToolPanel({ pageCount, form, saving, status, onDownload }: ToolP
                 </p>
               </>
             )}
+
+            {form.covers && <p className="tools__hint tools__note">{t.forms.coverNote}</p>}
 
             {form.xfa !== 'none' && (
               <p className="tools__hint">{form.xfa === 'pure' ? t.forms.xfaPure : t.forms.xfaHybrid}</p>

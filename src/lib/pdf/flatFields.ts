@@ -1,5 +1,5 @@
 import { degrees, rgb, type PDFDocument, type PDFFont, type PDFPage } from 'pdf-lib';
-import type { FormField, FormValues } from '../forms/types';
+import { isChanged, type FormField, type FormValues } from '../forms/types';
 import {
   normalizeRotation,
   pdfToScreenRect,
@@ -16,6 +16,8 @@ import { DEFAULT_LINE_HEIGHT, DEFAULT_PADDING, fitFontSize, wrapLines } from './
 export interface FlatFieldOptions {
   fields: FormField[];
   values: FormValues;
+  /** Values already in the document (prefilled cells): unchanged ones are left alone. */
+  initialValues: FormValues;
   /** Page box and rotation of every page, as used on screen. */
   geometries: PageGeometry[];
   /**
@@ -26,15 +28,27 @@ export interface FlatFieldOptions {
 }
 
 const INK = rgb(0.118, 0.149, 0.22); // #1E2638
+const PAPER = rgb(1, 1, 1);
 
 export function writeFlatFields(doc: PDFDocument, font: PDFFont, options: FlatFieldOptions): void {
-  const { fields, values, geometries, flatten } = options;
+  const { values, initialValues, geometries, flatten } = options;
   const measure = (text: string, size: number) => font.widthOfTextAtSize(text, size);
+
+  // Fields over existing content: untouched ones keep the original; changed
+  // ones hide it under a white box (the old content stays in the file below).
+  const fields = options.fields.filter((f) => !f.cover || isChanged(f, values, initialValues));
+  for (const field of fields) if (field.cover) coverArea(doc.getPage(field.pageIndex), field);
+
   if (flatten) {
     for (const field of fields) drawValue(doc.getPage(field.pageIndex), field, values[field.valueKey], geometries[field.pageIndex]!, font, measure);
   } else {
     createAcroFields(doc, font, fields, values, geometries, measure);
   }
+}
+
+function coverArea(page: PDFPage, field: FormField) {
+  const [x1, y1, x2, y2] = field.rect;
+  page.drawRectangle({ x: x1, y: y1, width: x2 - x1, height: y2 - y1, color: PAPER });
 }
 
 /** Size of the field box as seen on screen (scale 1), and its font size. */

@@ -102,11 +102,13 @@ describe('case B: tables', () => {
       ...headers.map((label) => ({ kind: 'text' as const, label })), // row 3
       ...headers.map((label) => ({ kind: 'text' as const, label })), // row 4
       { kind: 'text', label: 'Religione', box: [73, top(630) + 1.6 + 1, 221, top(600) - 1] }, // room under the caption
+      { kind: 'text', label: 'Restrizioni alimentari' }, // already filled: "Nessuna"
       { kind: 'checkbox', label: 'Sì' },
       { kind: 'checkbox', label: 'No' },
-      // Not fields: header row, the filled row, "Restrizioni alimentari: Nessuna", the question "Fumi?".
+      // Not fields: header row, the filled row, the question "Fumi?".
     ]);
     expect(fields[0]!.box.y1).toBeCloseTo(top(720) + 1, 0);
+    expect(fields.filter((f) => f.prefilled).map((f) => [f.label, f.value])).toEqual([['Restrizioni alimentari', 'Nessuna']]);
   });
 });
 
@@ -131,8 +133,20 @@ describe('case C: scanned pages (pixels only)', () => {
     expect(pt(0) + byOrigin('box')[0]!.box.x1).toBeCloseTo(pt(150), 0);
 
     const cells = byOrigin('cell');
-    expect(cells.filter((f) => f.kind === 'text')).toHaveLength(6); // 2 empty rows × 3 columns
+    // 2 empty rows × 3 columns, plus two cells with a caption on top.
+    expect(cells.filter((f) => f.kind === 'text')).toHaveLength(8);
     expect(cells.filter((f) => f.kind === 'multiline')).toHaveLength(1);
+
+    // Caption + value already written: a correction field under the caption.
+    const prefilled = fields.filter((f) => f.prefilled);
+    expect(prefilled).toHaveLength(1);
+    expect(prefilled[0]!.box.x1).toBeGreaterThan(pt(150));
+    expect(prefilled[0]!.box.x1).toBeLessThan(pt(150) + 3);
+    expect(prefilled[0]!.box.y1).toBeGreaterThan(pt(724)); // below the caption
+    expect(prefilled[0]!.box.y2).toBeLessThan(pt(770)); // above the cell border
+    // Caption only: an ordinary empty field under it.
+    const underCaption = cells.find((f) => !f.prefilled && Math.abs(f.box.x1 - pt(600)) < 3);
+    expect(underCaption?.box.y1).toBeGreaterThan(pt(724));
 
     const lines = byOrigin('line');
     expect(lines).toHaveLength(1);

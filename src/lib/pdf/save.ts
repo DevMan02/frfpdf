@@ -47,7 +47,13 @@ export async function savePdf(original: Uint8Array, options: SaveOptions = {}): 
     const flatFields = form.fields.filter((f) => f.source !== 'acroform');
     if (acroFields.length) fillAcroForm(doc, font, { ...form, fields: acroFields });
     if (flatFields.length) {
-      writeFlatFields(doc, font, { fields: flatFields, values: form.values, geometries: form.geometries, flatten: form.flatten });
+      writeFlatFields(doc, font, {
+        fields: flatFields,
+        values: form.values,
+        initialValues: form.initialValues,
+        geometries: form.geometries,
+        flatten: form.flatten,
+      });
     }
   }
 

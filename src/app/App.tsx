@@ -20,6 +20,7 @@ import {
   countAnswerable,
   countEmpty,
   isAnswerable,
+  isChanged,
   isEmptyValue,
   type FieldValue,
   type FormField,
@@ -53,6 +54,8 @@ export function App() {
   const [zoomState, setZoomState] = useState<ZoomState>({ mode: 'fit' });
   const [viewerWidth, setViewerWidth] = useState(0);
   const [values, setValues] = useState<FormValues>({});
+  /** What the document already contained (AcroForm values, text read in prefilled cells). */
+  const [initialValues, setInitialValues] = useState<FormValues>({});
   const [flatten, setFlatten] = useState(true);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [fields, setFields] = useState<FormField[]>([]);
@@ -88,7 +91,7 @@ export function App() {
    * On flat documents the fields are only guesses: they matter once the user
    * starts filling them in. A plain PDF with a decorative box is just downloaded.
    */
-  const startedFilling = fields.some((f) => !isEmptyValue(values[f.valueKey]));
+  const startedFilling = fields.some((f) => isChanged(f, values, initialValues));
   const formInUse = fields.length > 0 && (!flatDocument || startedFilling || !flatten);
 
   /** Looks for places to fill, page by page, while the document is already usable. */
@@ -103,7 +106,11 @@ export function App() {
         const result = await detectPage(target.pdf.proxy, index, geometry);
         if (docRef.current !== target) return;
         const found = detectedToFields(index, result.detected, geometry, () => t.forms.genericLabel(++labelCounter.current));
-        if (found.length) setFields((previous) => sortReadingOrder([...previous, ...found], geometryOf));
+        if (found.fields.length) setFields((previous) => sortReadingOrder([...previous, ...found.fields], geometryOf));
+        if (Object.keys(found.values).length) {
+          setInitialValues((previous) => ({ ...previous, ...found.values }));
+          setValues((previous) => ({ ...found.values, ...previous }));
+        }
         if (result.scanned && !scannedNoticeShown) {
           scannedNoticeShown = true;
           setMessage({ text: t.forms.scanned, tone: 'info' });
@@ -146,6 +153,7 @@ export function App() {
       setDoc(next);
       setFields(form.fields);
       setValues(form.initialValues);
+      setInitialValues(form.initialValues);
       setFlatten(true);
       setEditing(false);
       setSelectedId(null);
@@ -170,7 +178,8 @@ export function App() {
     (pageIndex: number, x: number, y: number) => {
       const geometry = geometryOf(pageIndex);
       const page = displaySize(geometry, 1);
-      const kind: AddKind = editing ? addKind : 'text';
+      const tool: AddKind = editing ? addKind : 'text';
+      const kind = tool === 'checkbox' ? 'checkbox' : 'text';
       const width = kind === 'checkbox' ? 12 : Math.min(200, page.width - 8);
       const height = kind === 'checkbox' ? 12 : 18;
       const left = Math.max(4, Math.min(kind === 'checkbox' ? x - width / 2 : x, page.width - width - 4));
@@ -182,9 +191,10 @@ export function App() {
         pageIndex,
         rect: screenToPdfRect({ left, top, width, height }, geometry, 1),
         kind,
-        label: t.forms.genericLabel(++labelCounter.current),
+        label: tool === 'cover' ? t.forms.coverLabel(++labelCounter.current) : t.forms.genericLabel(++labelCounter.current),
         source: 'manual',
         orientation: 'display',
+        cover: tool === 'cover' || undefined,
       };
       setFields((previous) => sortReadingOrder([...previous, field], geometryOf));
       if (editing) setSelectedId(id);
@@ -246,7 +256,7 @@ export function App() {
               form: {
                 fields,
                 values,
-                initialValues: doc.form.initialValues,
+                initialValues,
                 flatten,
                 geometries: doc.pdf.pages.map((p) => p.geometry),
               },
@@ -268,7 +278,7 @@ export function App() {
     } finally {
       setSaving(false);
     }
-  }, [doc, fields, values, flatten, formInUse]);
+  }, [doc, fields, values, initialValues, flatten, formInUse]);
 
   const requestDownload = useCallback(() => {
     if (formInUse && emptyCount > 0) setConfirmEmpty(true);
@@ -369,11 +379,13 @@ export function App() {
                 empty: emptyCount,
                 flatten,
                 xfa: doc.form.xfa,
+                covers: fields.some((f) => f.cover),
                 onFlattenChange: setFlatten,
                 detection: flatDocument
                   ? {
                       running: detecting,
-                      found: fields.filter((f) => f.source === 'detected').length,
+                      found: fields.filter((f) => f.source === 'detected' && !f.cover).length,
+                      prefilled: fields.filter((f) => f.source === 'detected' && f.cover).length,
                       editing,
                       addKind,
                       onToggleEditing: toggleEditing,

@@ -50,7 +50,7 @@ describe('saving detected fields (flattened)', () => {
   it('writes each value inside its field, on the baseline the screen shows', async () => {
     const original = fixture('flat-underscores.pdf');
     const [geometry] = await geometriesOf(original);
-    const fields = detectedToFields(0, await detectVectorFixture('flat-underscores.pdf'), geometry!, (i) => `Campo ${i}`);
+    const { fields } = detectedToFields(0, await detectVectorFixture('flat-underscores.pdf'), geometry!, (i) => `Campo ${i}`);
     const values: FormValues = { [fields[0]!.valueKey]: 'Mario Rossi', [fields[3]!.valueKey]: 'RSSMRA80A01F205X' };
 
     const bytes = await save(original, fields, values, true);
@@ -108,11 +108,60 @@ describe('saving detected fields (flattened)', () => {
   });
 });
 
+describe('correcting content that is already on the page', () => {
+  /** White filled rectangles drawn in the page content (the "bianchetto"). */
+  async function whiteBoxes(bytes: Uint8Array) {
+    const { OPS } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const pdf = await openWithPdfjs(bytes);
+    const ops = await (await pdf.getPage(1)).getOperatorList();
+    let white = false;
+    const boxes: number[][] = [];
+    ops.fnArray.forEach((fn, i) => {
+      const args = ops.argsArray[i] as unknown[];
+      if (fn === OPS.setFillRGBColor) white = args[0] === '#ffffff';
+      if (fn === OPS.constructPath && white && args[0] === OPS.fill) boxes.push(Array.from(args[2] as number[]));
+    });
+    return boxes;
+  }
+
+  it('covers the old value with a white box and writes the new one; untouched corrections change nothing', async () => {
+    const original = fixture('flat-table.pdf');
+    const [geometry] = await geometriesOf(original);
+    const { fields, values: found } = detectedToFields(0, await detectVectorFixture('flat-table.pdf'), geometry!, (i) => `Campo ${i}`);
+    const diet = fields.find((f) => f.label === 'Restrizioni alimentari')!;
+    expect(diet.cover).toBe(true);
+    expect(found[diet.valueKey]).toBe('Nessuna');
+
+    const extra: FormField = { ...manualField('correzione', 0, geometry!, { left: 76, top: 110, width: 100, height: 14 }), cover: true };
+    const allFields = [...fields, extra];
+    const save = (values: FormValues) =>
+      savePdf(original, {
+        form: { fields: allFields, values, initialValues: found, flatten: true, geometries: [geometry!] },
+        fontBytes: fieldFont(),
+      });
+
+    // Nothing changed: no white box at all.
+    expect(await whiteBoxes(await save(found))).toEqual([]);
+
+    const bytes = await save({ ...found, [diet.valueKey]: 'Vegetariana' });
+    const boxes = await whiteBoxes(bytes);
+    expect(boxes).toHaveLength(1); // the empty "correzione" field is not drawn
+    // pdf.js reports the path in its local coordinates (pdf-lib translates first): compare the size.
+    const [bx1, by1, bx2, by2] = boxes[0]!;
+    expect(bx2! - bx1!).toBeCloseTo(diet.rect[2] - diet.rect[0], 0);
+    expect(by2! - by1!).toBeCloseTo(diet.rect[3] - diet.rect[1], 0);
+    // Honest limit: the old text is still in the file, under the white box.
+    const texts = (await screenTexts(bytes, 0)).map((r) => r.str);
+    expect(texts).toContain('Vegetariana');
+    expect(texts).toContain('Nessuna');
+  });
+});
+
 describe('saving detected fields as a fillable form', () => {
   it('turns them into real AcroForm fields named after their labels', async () => {
     const original = fixture('flat-lines.pdf');
     const [geometry] = await geometriesOf(original);
-    const fields = detectedToFields(0, await detectVectorFixture('flat-lines.pdf'), geometry!, (i) => `Campo ${i}`);
+    const { fields } = detectedToFields(0, await detectVectorFixture('flat-lines.pdf'), geometry!, (i) => `Campo ${i}`);
     const byLabel = (label: string) => fields.find((f) => f.label === label)!;
     const values: FormValues = { [byLabel('Nome').valueKey]: 'Mario', [byLabel('Sì').valueKey]: true };
 

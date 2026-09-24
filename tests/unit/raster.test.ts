@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { binarize, findBoxes, findLines, inkRatio, type Bitmap } from '../../src/lib/detection/raster';
+import { binarize, findBoxes, findLines, hasWriting, inkBands, inkRatio, type Bitmap } from '../../src/lib/detection/raster';
 
 function blank(width: number, height: number): Bitmap {
   return { width, height, ink: new Uint8Array(width * height) };
@@ -55,6 +55,29 @@ describe('findBoxes', () => {
       }
     }
     expect(findBoxes(bmp, { minSize: 10, maxSize: 40 })).toEqual([{ x1: 10, y1: 10, x2: 30, y2: 30 }]);
+  });
+});
+
+describe('inkBands', () => {
+  it('splits a caption from the value written below it', () => {
+    const bmp = blank(100, 60);
+    fill(bmp, 5, 4, 40, 9); // caption
+    fill(bmp, 5, 25, 80, 40); // value
+    expect(inkBands(bmp, { x1: 0, y1: 0, x2: 100, y2: 60 }, 3)).toEqual([
+      { y1: 4, y2: 9 },
+      { y1: 25, y2: 40 },
+    ]);
+    expect(inkBands(blank(10, 10), { x1: 0, y1: 0, x2: 10, y2: 10 }, 3)).toEqual([]);
+  });
+});
+
+describe('hasWriting', () => {
+  it('notices one short word in a long empty box', () => {
+    const bmp = blank(400, 20);
+    fill(bmp, 10, 5, 30, 15);
+    expect(inkRatio(bmp, { x1: 0, y1: 0, x2: 400, y2: 20 })).toBeLessThan(0.04);
+    expect(hasWriting(bmp, { x1: 0, y1: 0, x2: 400, y2: 20 }, 20)).toBe(true);
+    expect(hasWriting(bmp, { x1: 100, y1: 0, x2: 400, y2: 20 }, 20)).toBe(false);
   });
 });
 

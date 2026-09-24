@@ -43,15 +43,30 @@ export interface FormField {
    * 'display' (detected or added by hand): text stays upright as the page is shown.
    */
   orientation?: 'page' | 'display';
+  /**
+   * Something is already written in this area of the page (a prefilled cell
+   * of a scan, or a "Sostituisci" field). A changed value is saved over a
+   * white box that hides the old content.
+   */
+  cover?: boolean;
 }
 
 /** Checkbox: boolean. Radio group: selected onValue ('' = none). Others: text. */
 export type FieldValue = string | boolean;
 export type FormValues = Record<string, FieldValue>;
 
-/** A field needs an answer before download (checkboxes can stay unticked, signatures come later). */
+/**
+ * A field needs an answer before download (checkboxes can stay unticked,
+ * signatures come later, fields over existing content are already filled).
+ */
 export function isAnswerable(field: FormField): boolean {
-  return !field.readOnly && field.kind !== 'checkbox' && field.kind !== 'signature';
+  return !field.readOnly && !field.cover && field.kind !== 'checkbox' && field.kind !== 'signature';
+}
+
+/** The user changed this value compared with what the document already had. */
+export function isChanged(field: FormField, values: FormValues, initialValues: FormValues): boolean {
+  const normalize = (v: FieldValue | undefined) => (v === undefined || v === false ? '' : v);
+  return normalize(values[field.valueKey]) !== normalize(initialValues[field.valueKey]);
 }
 
 export function isEmptyValue(value: FieldValue | undefined): boolean {

@@ -1,19 +1,22 @@
 import { screenToPdfRect, type PageGeometry } from '../pdf/coords';
-import type { FormField } from '../forms/types';
+import type { FormField, FormValues } from '../forms/types';
 import type { DetectedField } from './detect';
 
 /**
- * Detected fields (display space) to FormFields (PDF space). `nameFor` gives
- * a readable label to fields found without nearby text (e.g. on scans).
+ * Detected fields (display space) to FormFields (PDF space), with the values
+ * already written in the document when they can be read. `nameFor` gives a
+ * readable label to fields found without nearby text (e.g. on scans).
  */
 export function detectedToFields(
   pageIndex: number,
   detected: DetectedField[],
   geometry: PageGeometry,
   nameFor: (index: number) => string,
-): FormField[] {
-  return detected.map((d, i) => {
+): { fields: FormField[]; values: FormValues } {
+  const values: FormValues = {};
+  const fields = detected.map<FormField>((d, i) => {
     const id = `det-${pageIndex}-${i}`;
+    if (d.value) values[id] = d.value;
     return {
       id,
       valueKey: id,
@@ -27,6 +30,8 @@ export function detectedToFields(
       label: d.label || nameFor(i),
       source: 'detected',
       orientation: 'display',
+      cover: d.prefilled || undefined,
     };
   });
+  return { fields, values };
 }

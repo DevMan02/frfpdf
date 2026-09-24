@@ -65,30 +65,41 @@ test('flat PDF: finds the blanks, fills them and writes the values into the page
 test('scanned PDF: explains it is a scan, finds lines and boxes, lets you write anywhere', async ({ page }) => {
   const { errors } = await open(page, 'scanned.pdf');
   await expect(page.getByRole('status').filter({ hasText: 'Documento scansionato: clicca dove vuoi scrivere.' })).toBeVisible();
-  await expect(page.getByText('Trovati 10 spazi da compilare')).toBeVisible();
-  await expect(page.locator('.field')).toHaveCount(10);
+  await expect(page.getByText('Trovati 11 spazi da compilare')).toBeVisible();
+  await expect(page.getByText('1 campo è già compilato: per correggerlo, scrivici sopra.')).toBeVisible();
+  await expect(page.locator('.field')).toHaveCount(12);
+  await expect(page.locator('.field--cover')).toHaveCount(1);
+  await expect(page.getByText(/Il vecchio contenuto resta nel file/)).toBeVisible();
 
   // Click on an empty spot: a field appears there, ready to type.
   await clickPage(page, 0.5, 0.05);
-  await expect(page.locator('.field')).toHaveCount(11);
+  await expect(page.locator('.field')).toHaveCount(13);
   await page.keyboard.type('Nota a margine');
   await page.keyboard.press('Tab');
-  await expect(page.locator('.field')).toHaveCount(11);
+  await expect(page.locator('.field')).toHaveCount(13);
 
   // A field added by mistake and left empty goes away.
   await clickPage(page, 0.5, 0.95);
-  await expect(page.locator('.field')).toHaveCount(12);
+  await expect(page.locator('.field')).toHaveCount(14);
   await page.getByLabel('Campo 1', { exact: true }).focus();
-  await expect(page.locator('.field')).toHaveCount(11);
+  await expect(page.locator('.field')).toHaveCount(13);
+
+  // Correct the prefilled cell: typing turns the field white.
+  const correction = page.locator('.field--cover input');
+  await correction.fill('Valore corretto');
+  await expect(page.locator('.field--cover.has-value')).toHaveCount(1);
 
   const text = await pdfText(await download(page));
   expect(text).toContain('Nota a margine');
+  expect(text).toContain('Valore corretto');
   expect(errors).toEqual([]);
 });
 
 test('"Modifica campi": delete a wrong field, add a checkbox, save as a fillable form', async ({ page }) => {
   await open(page, 'flat-table.pdf');
   await expect(page.getByText('Trovati 13 spazi da compilare')).toBeVisible();
+  // "Restrizioni alimentari" already says "Nessuna": it starts with that value.
+  await expect(page.getByLabel('Restrizioni alimentari', { exact: true })).toHaveValue('Nessuna');
 
   await page.getByRole('button', { name: 'Modifica campi' }).click();
   await expect(page.getByText(/Trascina un campo per spostarlo/)).toBeVisible();
@@ -97,7 +108,7 @@ test('"Modifica campi": delete a wrong field, add a checkbox, save as a fillable
   const first = page.locator('.field--edit').first();
   await first.focus();
   await page.keyboard.press('Delete');
-  await expect(page.locator('.field--edit')).toHaveCount(12);
+  await expect(page.locator('.field--edit')).toHaveCount(13); // 13 empty + 1 prefilled, minus the deleted one
 
   // Arrow keys move the selected field.
   const second = page.locator('.field--edit').first();
@@ -112,11 +123,18 @@ test('"Modifica campi": delete a wrong field, add a checkbox, save as a fillable
   await clickPage(page, 0.8, 0.6);
   await expect(page.locator('.field--edit-checkbox')).toHaveCount(3);
 
+  // "Sostituisci": a field over text already printed, to correct it.
+  await page.getByRole('radio', { name: 'Sostituisci' }).check();
+  await clickPage(page, 0.3, 0.7);
+  await expect(page.getByRole('button', { name: /^Correzione \d+, campo di testo$/ })).toHaveCount(1);
+
   await page.getByRole('button', { name: 'Fine modifiche' }).click();
   await expect(page.locator('.field--edit')).toHaveCount(0);
+  await page.locator('.field--cover input').last().fill('Nuovo testo');
 
   await page.getByLabel('Blocca i campi compilati').uncheck();
   await expect(page.getByText('I campi diventano veri campi compilabili, anche in altri programmi.')).toBeVisible();
   const form = (await PDFDocument.load(await download(page))).getForm();
-  expect(form.getFields()).toHaveLength(13);
+  // 12 detected fields left + 1 checkbox + the changed correction; "Nessuna" was not changed, so it stays as it was.
+  expect(form.getFields()).toHaveLength(14);
 });
