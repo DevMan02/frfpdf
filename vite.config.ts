@@ -1,8 +1,8 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { pdfjsAssets } from './build/pdfjs-assets';
-import { contentSecurityPolicy } from './build/csp';
+import { pdfjsAssets } from './build/pdfjs-assets.ts';
+import { contentSecurityPolicy } from './build/csp.ts';
 
 // The app is served from https://<user>.github.io/frfpdf/ on GitHub Pages.
 const BASE = '/frfpdf/';
