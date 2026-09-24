@@ -41,6 +41,12 @@ interface FieldLayerProps {
   onAddAt?: (x: number, y: number) => void;
   /** A field added by hand was left empty. */
   onLeaveEmpty?: (field: FormField) => void;
+  /** A field was left or a drag ended: closes the undo step. */
+  onGestureEnd?: () => void;
+  /** Signature fields that already have a signature on them. */
+  signedFieldIds?: Set<string>;
+  /** "Firma qui" on a signature field. */
+  onSignField?: (fieldId: string) => void;
 }
 
 /** Editable fields positioned over a rendered page. */
@@ -72,6 +78,9 @@ export function FieldLayer(props: FieldLayerProps) {
             value={props.values[field.valueKey]}
             onChange={(value) => props.onChange(field.valueKey, value)}
             onLeaveEmpty={props.onLeaveEmpty}
+            onGestureEnd={props.onGestureEnd}
+            signed={props.signedFieldIds?.has(field.id) ?? false}
+            onSign={props.onSignField ? () => props.onSignField!(field.id) : undefined}
           />
         ),
       )}
@@ -124,9 +133,12 @@ interface FieldBoxProps {
   value: FieldValue | undefined;
   onChange: (value: FieldValue) => void;
   onLeaveEmpty?: (field: FormField) => void;
+  onGestureEnd?: () => void;
+  signed: boolean;
+  onSign?: () => void;
 }
 
-function FieldBox({ field, style, size, scale, value, onChange, onLeaveEmpty }: FieldBoxProps) {
+function FieldBox({ field, style, size, scale, value, onChange, onLeaveEmpty, onGestureEnd, signed, onSign }: FieldBoxProps) {
   const id = fieldElementId(field);
   const text = typeof value === 'string' ? value : '';
   const fontSize =
@@ -142,6 +154,7 @@ function FieldBox({ field, style, size, scale, value, onChange, onLeaveEmpty }: 
     padding: `0 ${DEFAULT_PADDING * scale}px`,
   };
   const onBlur = () => {
+    onGestureEnd?.();
     if (field.source === 'manual' && isEmptyValue(value)) onLeaveEmpty?.(field);
   };
   // Over existing content: see-through until something is typed, then the
@@ -264,11 +277,19 @@ function FieldBox({ field, style, size, scale, value, onChange, onLeaveEmpty }: 
       );
 
     case 'signature':
-      // Placeholder only: signing arrives in phase 3.
+      // The signature itself is drawn by the signature layer once placed.
+      if (signed) return null;
       return (
-        <div className="field field--signature" style={style} aria-hidden="true">
-          <span style={{ fontSize: Math.min(12 * scale, size.height * scale * 0.4) }}>{t.forms.signatureHere}</span>
-        </div>
+        <button
+          id={id}
+          type="button"
+          className="field field--signature"
+          style={style}
+          onClick={onSign}
+          aria-label={t.signature.signHereFor(field.label)}
+        >
+          <span style={{ fontSize: Math.min(12 * scale, size.height * scale * 0.4) }}>{t.signature.signHere}</span>
+        </button>
       );
   }
 }
@@ -281,7 +302,17 @@ interface EditableBoxProps extends FieldLayerProps {
   rect: ScreenRect;
 }
 
-function EditableBox({ field, rect, geometry, scale, selectedId, onSelect, onRectChange, onRemove }: EditableBoxProps) {
+function EditableBox({
+  field,
+  rect,
+  geometry,
+  scale,
+  selectedId,
+  onSelect,
+  onRectChange,
+  onRemove,
+  onGestureEnd,
+}: EditableBoxProps) {
   const drag = useRef<{ mode: 'move' | 'resize'; x: number; y: number; start: ScreenRect } | null>(null);
   const page = displaySize(geometry, scale);
   const selected = selectedId === field.id;
@@ -315,7 +346,9 @@ function EditableBox({ field, rect, geometry, scale, selectedId, onSelect, onRec
   };
 
   const endDrag = () => {
+    if (!drag.current) return;
     drag.current = null;
+    onGestureEnd?.();
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {

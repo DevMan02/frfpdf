@@ -80,7 +80,7 @@ export function fillAcroForm(doc: PDFDocument, font: PDFFont, options: FillOptio
  * Like form.removeField(), which throws on widgets without an appearance
  * stream (typical of empty signature fields).
  */
-function removeFieldAndWidgets(doc: PDFDocument, field: PDFSignature): void {
+export function removeFieldAndWidgets(doc: PDFDocument, field: PDFSignature): void {
   const refs: PDFRef[] = [field.ref];
   const kids = field.acroField.Kids();
   for (let i = 0; i < (kids?.size() ?? 0); i++) {

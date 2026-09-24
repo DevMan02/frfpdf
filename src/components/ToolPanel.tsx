@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { t } from '../i18n';
 import { EDIT_HELP_ID } from '../features/forms/FieldLayer';
+import { SIGNATURE_HELP_ID } from '../features/signature/SignatureLayer';
 import type { XfaStatus } from '../features/forms/readForm';
 import { Icon } from './Icon';
 import { PrivacyNote } from './PrivacyNote';
@@ -32,16 +33,28 @@ export interface FormSummary {
   detection: DetectionSummary | null;
 }
 
+export interface SignatureSummary {
+  /** Signatures placed on the document. */
+  count: number;
+  /** Preview of the signature "Aggiungi firma" will use, if one is ready. */
+  currentUrl: string | null;
+  withDate: boolean;
+  onAdd: () => void;
+  onNew: () => void;
+  onWithDateChange: (withDate: boolean) => void;
+}
+
 interface ToolPanelProps {
   pageCount: number;
   form: FormSummary | null;
+  signature: SignatureSummary;
   saving: boolean;
   status: string;
   onDownload: () => void;
 }
 
 /** Right-hand panel on desktop, bottom bar on mobile. */
-export function ToolPanel({ pageCount, form, saving, status, onDownload }: ToolPanelProps) {
+export function ToolPanel({ pageCount, form, signature, saving, status, onDownload }: ToolPanelProps) {
   // Mobile only: the options are folded away in the bottom bar.
   const [optionsOpen, setOptionsOpen] = useState(false);
   const detection = form?.detection ?? null;
@@ -146,9 +159,44 @@ export function ToolPanel({ pageCount, form, saving, status, onDownload }: ToolP
             )}
           </section>
         )}
+
+        <section className="tools__section" aria-labelledby="tools-signature-title">
+          <h2 id="tools-signature-title" className="tools__heading">
+            {t.signature.title}
+          </h2>
+          {signature.currentUrl && (
+            <div className="tools__signature-preview">
+              <img src={signature.currentUrl} alt={t.signature.current} />
+              <button type="button" className="link-button" onClick={signature.onNew}>
+                {t.signature.new}
+              </button>
+            </div>
+          )}
+          {signature.count > 0 && (
+            <>
+              <p className="tools__progress">{t.signature.count(signature.count)}</p>
+              <p id={SIGNATURE_HELP_ID} className="tools__hint">
+                {t.signature.help}
+              </p>
+            </>
+          )}
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={signature.withDate}
+              onChange={(e) => signature.onWithDateChange(e.target.checked)}
+            />
+            <span>{t.signature.withDate}</span>
+          </label>
+          <p className="tools__hint tools__note">{t.signature.legal}</p>
+        </section>
       </div>
 
       <div className="tools__footer">
+        <button type="button" className="button button--quiet tools__sign" onClick={signature.onAdd}>
+          <Icon name="pen" />
+          {t.signature.add}
+        </button>
         <button type="button" className="button button--primary tools__download" onClick={onDownload} disabled={saving}>
           <Icon name="download" />
           {saving ? t.status.preparing : t.tools.download}

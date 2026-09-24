@@ -242,6 +242,28 @@ await writePdf('scanned.pdf', async (doc) => {
   page.drawImage(image, { x: 0, y: 0, width: A4[0], height: A4[1] });
 });
 
+// 14. A "photo" of a signature: dark strokes on greyish, slightly noisy paper.
+{
+  const width = 600;
+  const height = 200;
+  const pixels = new Uint8Array(width * height);
+  let seed = 11;
+  const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < pixels.length; i++) pixels[i] = 225 + Math.floor(random() * 20);
+  const dot = (cx, cy, r) => {
+    for (let y = Math.max(0, cy - r); y < Math.min(height, cy + r); y++) {
+      for (let x = Math.max(0, cx - r); x < Math.min(width, cx + r); x++) {
+        if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) pixels[y * width + x] = 35;
+      }
+    }
+  };
+  for (let x = 60; x < 540; x++) {
+    const y = 100 + Math.round(45 * Math.sin(x / 28) * Math.cos(x / 90));
+    dot(x, y, 4);
+  }
+  writeFileSync(join(OUT, 'signature-photo.png'), encodeGrayPng(width, height, pixels));
+}
+
 console.log(`Fixtures written to ${OUT}`);
 
 // ---------------------------------------------------------------------------

@@ -12,6 +12,10 @@ interface ToolbarProps {
   onZoomOut: () => void;
   onFitWidth: () => void;
   onOpenClick: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 export function Toolbar({
@@ -24,6 +28,10 @@ export function Toolbar({
   onZoomOut,
   onFitWidth,
   onOpenClick,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
 }: ToolbarProps) {
   return (
     <header className="toolbar">
@@ -39,6 +47,31 @@ export function Toolbar({
       <p className="toolbar__page" aria-live="polite">
         {t.toolbar.pageOf(currentPage, pageCount)}
       </p>
+
+      <div className="toolbar__history" role="group" aria-label={`${t.history.undo} / ${t.history.redo}`}>
+        <button
+          type="button"
+          className="icon-button"
+          onClick={onUndo}
+          disabled={!canUndo}
+          aria-label={t.history.undo}
+          title={`${t.history.undo} (Ctrl+Z)`}
+          aria-keyshortcuts="Control+Z"
+        >
+          <Icon name="undo" />
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          onClick={onRedo}
+          disabled={!canRedo}
+          aria-label={t.history.redo}
+          title={`${t.history.redo} (Ctrl+Y)`}
+          aria-keyshortcuts="Control+Y"
+        >
+          <Icon name="redo" />
+        </button>
+      </div>
 
       <div className="toolbar__zoom" role="group" aria-label={t.toolbar.zoomLevel}>
         <button
